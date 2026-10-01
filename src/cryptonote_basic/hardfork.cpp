@@ -80,7 +80,7 @@ bool HardFork::add_fork(uint8_t version, uint64_t height, uint8_t threshold, tim
   if (!heights.empty()) {
     if (version <= heights.back().version)
       return false;
-    if (height <= heights.back().height)
+    if (height < heights.back().height)
       return false;
     if (time <= heights.back().time)
       return false;
