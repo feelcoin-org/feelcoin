@@ -19,21 +19,21 @@ The Feelcoin ecosystem includes:
 
 ## Latest Release
 
-### Feelcoin v0.1.0 — Linux x64
+### Feelcoin v0.2.0 — Linux x64 / Windows x64
 
 Download the latest Feelcoin binaries from:
 
 https://github.com/feelcoin-dev/feelcoin/releases/latest
 
-Included binaries:
+Included core binaries:
 
 - `feelcoind`
 - `feelcoin-wallet-cli`
 - `feelcoin-wallet-rpc`
 
-A SHA-256 checksum file is provided with the release.
+SHA-256 checksum files should be provided with release assets.
 
-Always verify the checksum before running downloaded binaries.
+Always verify checksums before running downloaded binaries.
 
 ---
 
@@ -66,6 +66,14 @@ The pool provides:
 - Automatic payout support
 - Feelcoin block explorer integration
 
+Current official pool fee:
+
+```text
+0.5%
+```
+
+This is a pool service fee and is separate from the protocol-level development treasury.
+
 ---
 
 ### Feelcoin Block Explorer
@@ -85,6 +93,12 @@ The explorer provides:
 - Transaction lookup
 - Block reward information
 - Hash search
+
+Explorer fee:
+
+```text
+0%
+```
 
 ---
 
@@ -106,6 +120,12 @@ Features include:
 - Public address QR code
 - Printable paper wallet
 - PDF export
+
+Paper wallet fee:
+
+```text
+0%
+```
 
 ---
 
@@ -129,6 +149,52 @@ Feelcoin uses 12 decimal places.
 ```text
 1 FEEL = 1,000,000,000,000 atomic units
 ```
+
+---
+
+## Block Reward & Development Treasury
+
+Starting from **block 590**, Feelcoin uses a consensus-enforced development treasury.
+
+For every block subsidy:
+
+| Allocation | Amount |
+|---|---:|
+| Miner / Pool | 98% |
+| Feelcoin Development Treasury | 2% |
+
+Transaction fees are **not** subject to the development allocation.
+
+```text
+Block subsidy:
+98% -> miner / pool
+ 2% -> Feelcoin development treasury
+
+Transaction fees:
+100% -> miner / pool
+```
+
+### Development Treasury Address
+
+```text
+FBXZD77V6Rac7o7Ukc16j8g6iPpu6LuV5Udi3UMgopATBGrbycUSTmXUQcm1B2bx8HMYyjZHxoEtqUokaUweUvWKMEbnBkc
+```
+
+The treasury rule is enforced by Feelcoin consensus. Blocks created at or after height 590 must contain the required treasury output.
+
+The treasury allocation does **not** create additional inflation. It is deducted from the existing block subsidy.
+
+### Fee Summary
+
+| Fee / Allocation | Amount | Destination |
+|---|---:|---|
+| Development Treasury | 2% of block subsidy | Feelcoin development treasury |
+| Miner / Pool Subsidy | 98% of block subsidy | Block miner / pool |
+| Transaction Fees | 100% | Block miner / pool |
+| Official Pool Fee | 0.5% | Pool operation / infrastructure |
+| Solo Mining Pool Fee | 0% | — |
+| Block Explorer Fee | 0% | — |
+| Paper Wallet Fee | 0% | — |
 
 ---
 
@@ -179,181 +245,80 @@ RandomX is designed primarily for general-purpose CPUs.
 
 Mining can be performed through:
 
-- The official Feelcoin mining pool
-- Compatible RandomX mining software
-- The built-in Feelcoin daemon miner
+- Solo mining
+- Official Feelcoin pool
+- Compatible third-party RandomX mining software
 
-Official mining pool repository:
+### Solo Mining
 
-https://github.com/feelcoin-dev/feelcoin-pool
-
----
-
-## Built-in Solo Mining
-
-The Feelcoin daemon includes a built-in miner.
-
-Example:
+Start the daemon and use:
 
 ```text
-start_mining YOUR_FEELCOIN_ADDRESS 1
+start_mining <FEEL_ADDRESS> <THREADS>
 ```
 
-The final value specifies the number of CPU mining threads.
-
-Example using four threads:
-
-```text
-start_mining YOUR_FEELCOIN_ADDRESS 4
-```
-
-Mining status can be checked with:
+Check mining status:
 
 ```text
 mining_status
 ```
 
-Mining can be stopped with:
+Stop mining:
 
 ```text
 stop_mining
 ```
 
----
-
-## Build From Source
-
-Feelcoin is derived from the Monero codebase.
-
-Clone the repository:
-
-```bash
-git clone https://github.com/feelcoin-dev/feelcoin.git
-cd feelcoin
-```
-
-Build:
-
-```bash
-make release
-```
-
-The exact build directory may vary depending on platform and build configuration.
+Solo miners do not pay the official pool fee. The protocol-level 2% development treasury still applies from block 590 onward.
 
 ---
 
-## Release Verification
+## Security
 
-Feelcoin binary releases include SHA-256 checksums.
-
-Example:
-
-```bash
-sha256sum feelcoin-v0.1.0-linux-x64.tar.gz
-```
-
-Compare the resulting hash with the provided:
-
-```text
-feelcoin-v0.1.0-linux-x64.tar.gz.sha256
-```
-
-Do not run downloaded binaries if the checksum does not match.
+- Never share wallet seeds.
+- Never share private spend keys.
+- Keep wallet RPC bound to localhost unless it is properly authenticated and firewalled.
+- Verify release checksums.
+- Back up wallet seeds offline.
+- Treat any wallet credentials exposed publicly as compromised.
 
 ---
 
-## Wallet Security
+## Open Source Lineage
 
-Never share:
+Feelcoin is derived from the Monero open-source codebase and inherits battle-tested cryptographic, networking, wallet, and RandomX foundations.
 
-- Recovery seeds
-- Private spend keys
-- Wallet password files
-- Private wallet files
-- Private RPC credentials
+Feelcoin is not presented as a clean-room implementation of those technologies.
 
-Anyone who obtains your recovery seed or private spend key can control the funds stored in the wallet.
+Feelcoin operates as an independent blockchain with its own:
 
-Always keep secure backups of important wallet information.
-
----
-
-## Paper Wallet Security
-
-The Feelcoin paper wallet generator can create printable wallet recovery information.
-
-Paper wallets should be stored securely and privately.
-
-Anyone who obtains the printed recovery seed or private spend key can access the wallet.
-
-For high-security storage, offline wallet generation is recommended.
+- Genesis
+- Network identity
+- Address namespace
+- Chain history
+- Infrastructure
+- Releases
+- Development direction
+- Consensus-enforced development treasury
 
 ---
 
 ## Development Status
 
-Feelcoin is currently in early public development.
+Feelcoin is under active development.
 
-Components may continue to evolve, including:
+Current ecosystem components include:
 
-- Core software
-- Network configuration
-- Mining infrastructure
-- Wallet tooling
+- Core node
+- CLI wallet
+- Wallet RPC
+- Mining pool
 - Block explorer
-- Pool software
-- Documentation
-
-Users should verify release notes and checksums when upgrading.
-
----
-
-## Official Repositories
-
-### Core
-
-https://github.com/feelcoin-dev/feelcoin
-
-### Mining Pool
-
-https://github.com/feelcoin-dev/feelcoin-pool
-
-### Block Explorer
-
-https://github.com/feelcoin-dev/feelcoin-explorer
-
-### Paper Wallet
-
-https://github.com/feelcoin-dev/feelcoin-paper-wallet
+- Paper wallet
+- Linux release
+- Windows release in preparation
+- Consensus-enforced 2% development treasury
 
 ---
-
-## Current Release
-
-```text
-Feelcoin v0.1.0
-```
-
-Platform currently published:
-
-```text
-Linux x64
-```
-
-Windows builds may be published in future releases.
-
----
-
-## License
-
-Feelcoin is derived from open-source Monero technology.
-
-Applicable upstream licenses and licenses of incorporated open-source components remain applicable.
-
-See the repository licensing files for details.
-
----
-
-# Feelcoin
 
 ## In Feels We Trust
