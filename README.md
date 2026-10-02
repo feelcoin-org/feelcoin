@@ -1,64 +1,39 @@
-<p align="center">
-  <img src="https://i.imgur.com/VPorAY4.jpeg" alt="Feelcoin Logo" width="180">
-</p>
+# Feelcoin
 
-<h1 align="center">Feelcoin</h1>
+![Feelcoin Logo](https://i.imgur.com/VPorAY4.jpeg)
 
-<p align="center">
-  Independent RandomX Proof-of-Work cryptocurrency.
-</p>
+## In Feels We Trust
 
-<p align="center">
-  <strong>In Feels We Trust</strong>
-</p>
+Feelcoin is an independent RandomX Proof-of-Work cryptocurrency derived from Monero technology.
 
----
+The Feelcoin ecosystem includes:
 
-## Overview
-
-Feelcoin is an independent cryptocurrency project built from the Monero codebase and adapted into its own network, branding, configuration, ports, data paths, services, mining pool, and block explorer.
-
-Feelcoin uses the RandomX Proof-of-Work algorithm and is designed for CPU-friendly mining.
-
-This repository contains the core Feelcoin blockchain software, including the daemon, wallet components, RPC services, consensus configuration, networking code, blockchain utilities, and supporting libraries.
+- Core node software
+- CLI wallet
+- Wallet RPC
+- Mining pool
+- Block explorer
+- Paper wallet generator
 
 ---
 
-## Project Status
+## Latest Release
 
-Feelcoin is currently in early public development and testing.
+### Feelcoin v0.1.0 — Linux x64
 
-Current public version identity:
+Download the latest Feelcoin binaries from:
 
-`Feelcoin v0.1.0`
+https://github.com/feelcoin-dev/feelcoin/releases/latest
 
-Current network type:
+Included binaries:
 
-`mainnet`
+- `feelcoind`
+- `feelcoin-wallet-cli`
+- `feelcoin-wallet-rpc`
 
-Project motto:
+A SHA-256 checksum file is provided with the release.
 
-> **In Feels We Trust**
-
----
-
-## Core Features
-
-- RandomX Proof-of-Work
-- CPU-friendly mining
-- Independent Feelcoin network identity
-- Feelcoin-specific ports
-- Feelcoin-specific data directory
-- Feelcoin daemon
-- Wallet support
-- Daemon JSON-RPC
-- Wallet RPC support
-- Mining pool support
-- Block explorer support
-- P2P networking
-- LMDB blockchain storage
-- Monero-derived privacy architecture
-- Open-source development
+Always verify the checksum before running downloaded binaries.
 
 ---
 
@@ -66,419 +41,319 @@ Project motto:
 
 ### Feelcoin Core
 
+Main Feelcoin node and wallet implementation.
+
 Repository:
 
-`https://github.com/feelcoin-dev/feelcoin`
+https://github.com/feelcoin-dev/feelcoin
+
+---
 
 ### Feelcoin Mining Pool
 
+Official RandomX mining pool for the Feelcoin network.
+
 Repository:
 
-`https://github.com/feelcoin-dev/feelcoin-pool`
+https://github.com/feelcoin-dev/feelcoin-pool
 
-Mining endpoint:
+The pool provides:
 
-`162.35.27.43:4242`
+- RandomX mining
+- Live pool statistics
+- Miner tracking
+- PPLNS reward accounting
+- Automatic payout support
+- Feelcoin block explorer integration
 
-Pool dashboard:
-
-`http://162.35.27.43:4243`
+---
 
 ### Feelcoin Block Explorer
 
+Official Feelcoin blockchain explorer.
+
 Repository:
 
-`https://github.com/feelcoin-dev/feelcoin-explorer`
+https://github.com/feelcoin-dev/feelcoin-explorer
 
-Explorer:
+The explorer provides:
 
-`http://162.35.27.43:8081`
-
----
-
-## Network Services
-
-Current Feelcoin service ports:
-
-| Service | Port |
-|---|---:|
-| Feelcoin Daemon RPC | `35781` |
-| Feelcoin Wallet RPC | `35784` |
-| Mining Pool | `4242` |
-| Pool Dashboard | `4243` |
-| Block Explorer | `8081` |
-
-The daemon RPC and wallet RPC should normally remain bound to localhost unless explicitly configured otherwise.
+- Blockchain height
+- Network statistics
+- Latest blocks
+- Block lookup
+- Transaction lookup
+- Block reward information
+- Hash search
 
 ---
 
-## Data Directory
+### Feelcoin Paper Wallet
 
-The default Feelcoin blockchain data directory is:
+Official Feelcoin paper wallet generator.
 
-`~/.feelcoin/`
+Repository:
 
-The LMDB blockchain database is stored under:
+https://github.com/feelcoin-dev/feelcoin-paper-wallet
 
-`~/.feelcoin/lmdb/`
+Features include:
+
+- Genuine Feelcoin wallet generation
+- Feelcoin public address
+- 25-word recovery seed
+- Private spend key
+- Private view key
+- Public address QR code
+- Printable paper wallet
+- PDF export
 
 ---
 
-## Build
+## Network Information
 
-Feelcoin is built using CMake and the standard project build system.
+| Parameter | Value |
+|---|---|
+| Network | Feelcoin Mainnet |
+| Consensus | Proof of Work |
+| Mining Algorithm | RandomX |
+| Block Target | 120 seconds |
+| Decimal Places | 12 |
+| Standard Address Prefix | 84 |
+| Integrated Address Prefix | 85 |
+| Subaddress Prefix | 86 |
 
-From the repository root:
+### Monetary Units
 
-```bash
-cd /home/feeladmin/feelcoin
-```
-
-Create or use the configured build tree and compile the project.
-
-The current release build tree used by this deployment is:
+Feelcoin uses 12 decimal places.
 
 ```text
-build/Linux/feelcoin-main/release
-```
-
-Core binaries are produced under:
-
-```text
-build/Linux/feelcoin-main/release/bin/
+1 FEEL = 1,000,000,000,000 atomic units
 ```
 
 ---
 
-## Feelcoin Daemon
+## Quick Start
 
-The Feelcoin daemon binary is:
-
-```text
-build/Linux/feelcoin-main/release/bin/feelcoind
-```
-
-Run manually:
+### Start the Feelcoin daemon
 
 ```bash
-cd /home/feeladmin/feelcoin
-
-./build/Linux/feelcoin-main/release/bin/feelcoind
+./feelcoind
 ```
 
-For non-interactive/server use:
+The daemon downloads, validates, and maintains the Feelcoin blockchain.
+
+### Create or open a wallet
 
 ```bash
-./build/Linux/feelcoin-main/release/bin/feelcoind --non-interactive
+./feelcoin-wallet-cli
 ```
 
-The non-interactive option is recommended when running under systemd.
+The wallet CLI can be used to:
 
----
+- Create wallets
+- Restore wallets from seed
+- View balances
+- Generate addresses
+- Send FEEL
+- Receive FEEL
 
-## Daemon RPC
+### Wallet RPC
 
-The Feelcoin daemon RPC endpoint used by the current deployment is:
-
-`127.0.0.1:35781`
-
-Example network information request:
+For applications and services:
 
 ```bash
-curl -s http://127.0.0.1:35781/get_info
+./feelcoin-wallet-rpc --help
 ```
 
-Example JSON-RPC request:
+The wallet RPC is used by services such as mining pools and wallet applications.
 
-```bash
-curl -s http://127.0.0.1:35781/json_rpc   -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":"0","method":"get_block_count"}'
-```
-
-The RPC interface is used by the mining pool and block explorer.
-
----
-
-## Wallet RPC
-
-The current Feelcoin wallet RPC port is:
-
-`35784`
-
-The mining pool is configured to communicate with wallet RPC through:
-
-```text
-127.0.0.1:35784
-```
-
-For security, wallet RPC should not be exposed directly to the public internet.
+For security, wallet RPC services should normally remain bound to localhost unless properly secured.
 
 ---
 
 ## Mining
 
-Feelcoin uses RandomX Proof-of-Work.
+Feelcoin uses the RandomX Proof-of-Work algorithm.
 
-The current public mining pool endpoint is:
+RandomX is designed primarily for general-purpose CPUs.
 
-`162.35.27.43:4242`
+Mining can be performed through:
 
-Example XMRig command:
+- The official Feelcoin mining pool
+- Compatible RandomX mining software
+- The built-in Feelcoin daemon miner
 
-```bash
-xmrig -o 162.35.27.43:4242   -u YOUR_FEELCOIN_WALLET_ADDRESS   -p x
-```
+Official mining pool repository:
 
-Replace `YOUR_FEELCOIN_WALLET_ADDRESS` with a valid Feelcoin wallet address.
-
-For full pool instructions, see:
-
-`https://github.com/feelcoin-dev/feelcoin-pool`
+https://github.com/feelcoin-dev/feelcoin-pool
 
 ---
 
-## Mining Pool
+## Built-in Solo Mining
 
-The Feelcoin mining pool currently provides:
+The Feelcoin daemon includes a built-in miner.
 
-- RandomX mining
-- PPLNS reward accounting
-- dynamic difficulty
-- miner statistics
-- pool statistics
-- web dashboard
-- miner lookup
-- block explorer integration
-- configurable pool fee
-- configurable payout threshold
-
-Pool dashboard:
-
-`http://162.35.27.43:4243`
-
----
-
-## Block Explorer
-
-The Feelcoin block explorer connects directly to the local `feelcoind` RPC service.
-
-It currently provides:
-
-- blockchain height
-- network difficulty
-- estimated network hashrate
-- latest blocks
-- block height search
-- block hash search
-- transaction hash search
-- mempool statistics
-- network connection information
-
-Explorer:
-
-`http://162.35.27.43:8081`
-
-Repository:
-
-`https://github.com/feelcoin-dev/feelcoin-explorer`
-
----
-
-## Automatic Service Startup
-
-The current server deployment uses systemd to manage:
-
-- `feelcoind`
-- `feelcoin-pool`
-- `feelcoin-explorer`
-
-Example daemon service:
-
-```ini
-[Unit]
-Description=Feelcoin Daemon
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=feeladmin
-WorkingDirectory=/home/feeladmin/feelcoin
-ExecStart=/home/feeladmin/feelcoin/build/Linux/feelcoin-main/release/bin/feelcoind --non-interactive
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable:
-
-```bash
-sudo systemctl enable feelcoind
-```
-
-Start:
-
-```bash
-sudo systemctl start feelcoind
-```
-
-Check status:
-
-```bash
-sudo systemctl status feelcoind
-```
-
----
-
-## Health Checks
-
-Check the daemon RPC:
-
-```bash
-sudo ss -lntp | grep 35781
-```
-
-Check all Feelcoin services:
-
-```bash
-sudo systemctl is-active feelcoind feelcoin-pool feelcoin-explorer
-```
-
-Check currently used service ports:
-
-```bash
-sudo ss -lntp | grep -E '35781|4242|4243|8081'
-```
-
-A healthy deployment should show:
+Example:
 
 ```text
-feelcoind           active
-feelcoin-pool       active
-feelcoin-explorer   active
+start_mining YOUR_FEELCOIN_ADDRESS 1
 ```
 
----
+The final value specifies the number of CPU mining threads.
 
-## Repository Structure
-
-The project is based on the Monero source tree, with Feelcoin-specific changes across core blockchain, networking, RPC, wallet, configuration, and utility components.
-
-Important modified areas include:
+Example using four threads:
 
 ```text
-src/blockchain_utilities/
-src/checkpoints/
-src/cryptonote_basic/
-src/cryptonote_core/
-src/p2p/
-src/rpc/
-src/wallet/
+start_mining YOUR_FEELCOIN_ADDRESS 4
 ```
 
-Feelcoin-specific blockchain utility source:
+Mining status can be checked with:
 
 ```text
-src/blockchain_utilities/feelcoin_genesis.cpp
+mining_status
 ```
 
----
-
-## Development
-
-The primary Feelcoin development branch is:
-
-`main`
-
-The project preserves an upstream Monero remote for reference and future source review.
-
-Recommended Git remote structure:
+Mining can be stopped with:
 
 ```text
-origin    git@github.com:feelcoin-dev/feelcoin.git
-upstream  https://github.com/monero-project/monero.git
+stop_mining
 ```
 
-This allows Feelcoin development to remain independent while still making upstream comparison and maintenance possible.
+---
+
+## Build From Source
+
+Feelcoin is derived from the Monero codebase.
+
+Clone the repository:
+
+```bash
+git clone https://github.com/feelcoin-dev/feelcoin.git
+cd feelcoin
+```
+
+Build:
+
+```bash
+make release
+```
+
+The exact build directory may vary depending on platform and build configuration.
 
 ---
 
-## Security
+## Release Verification
 
-For production deployments:
+Feelcoin binary releases include SHA-256 checksums.
 
-- keep daemon RPC private unless public access is intentionally required
-- keep wallet RPC private
-- never publish wallet seeds or private keys
-- never commit wallet files containing secrets
-- never commit production credentials
-- use firewall rules
-- use HTTPS for public websites
-- use TLS for public mining endpoints when available
-- keep the operating system and dependencies updated
-- monitor daemon, pool, and explorer logs
-- back up important wallet and configuration data securely
+Example:
+
+```bash
+sha256sum feelcoin-v0.1.0-linux-x64.tar.gz
+```
+
+Compare the resulting hash with the provided:
+
+```text
+feelcoin-v0.1.0-linux-x64.tar.gz.sha256
+```
+
+Do not run downloaded binaries if the checksum does not match.
 
 ---
 
-## Related Repositories
+## Wallet Security
+
+Never share:
+
+- Recovery seeds
+- Private spend keys
+- Wallet password files
+- Private wallet files
+- Private RPC credentials
+
+Anyone who obtains your recovery seed or private spend key can control the funds stored in the wallet.
+
+Always keep secure backups of important wallet information.
+
+---
+
+## Paper Wallet Security
+
+The Feelcoin paper wallet generator can create printable wallet recovery information.
+
+Paper wallets should be stored securely and privately.
+
+Anyone who obtains the printed recovery seed or private spend key can access the wallet.
+
+For high-security storage, offline wallet generation is recommended.
+
+---
+
+## Development Status
+
+Feelcoin is currently in early public development.
+
+Components may continue to evolve, including:
+
+- Core software
+- Network configuration
+- Mining infrastructure
+- Wallet tooling
+- Block explorer
+- Pool software
+- Documentation
+
+Users should verify release notes and checksums when upgrading.
+
+---
+
+## Official Repositories
 
 ### Core
 
-`https://github.com/feelcoin-dev/feelcoin`
+https://github.com/feelcoin-dev/feelcoin
 
 ### Mining Pool
 
-`https://github.com/feelcoin-dev/feelcoin-pool`
+https://github.com/feelcoin-dev/feelcoin-pool
 
 ### Block Explorer
 
-`https://github.com/feelcoin-dev/feelcoin-explorer`
+https://github.com/feelcoin-dev/feelcoin-explorer
+
+### Paper Wallet
+
+https://github.com/feelcoin-dev/feelcoin-paper-wallet
 
 ---
 
-## Branding
+## Current Release
 
-<p align="center">
-  <img src="https://i.imgur.com/VPorAY4.jpeg" alt="Feelcoin" width="130">
-</p>
+```text
+Feelcoin v0.1.0
+```
 
-<p align="center">
-  <strong>Feelcoin</strong>
-</p>
+Platform currently published:
 
-<p align="center">
-  <strong>In Feels We Trust</strong>
-</p>
+```text
+Linux x64
+```
 
----
-
-## Upstream Attribution
-
-Feelcoin is derived from the open-source Monero project and has been modified to operate as an independent network.
-
-Original upstream repository:
-
-`https://github.com/monero-project/monero`
-
-Feelcoin retains upstream attribution and licensing obligations where applicable.
-
-The Monero project and its contributors are not responsible for, affiliated with, or endorsing Feelcoin unless explicitly stated otherwise.
+Windows builds may be published in future releases.
 
 ---
 
 ## License
 
-See the repository `LICENSE` file for licensing information and applicable upstream notices.
+Feelcoin is derived from open-source Monero technology.
+
+Applicable upstream licenses and licenses of incorporated open-source components remain applicable.
+
+See the repository licensing files for details.
 
 ---
 
-<p align="center">
-  <strong>Feelcoin Network</strong>
-</p>
+# Feelcoin
 
-<p align="center">
-  <strong>In Feels We Trust</strong>
-</p>
+## In Feels We Trust
