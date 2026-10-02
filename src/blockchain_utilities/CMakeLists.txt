@@ -331,3 +331,22 @@ target_link_libraries(blockchain_prune
     ${Boost_THREAD_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}
     ${EXTRA_LIBRARIES})
+
+# Feelcoin genesis transaction generator
+monero_add_executable(feelcoin_genesis
+  feelcoin_genesis.cpp)
+
+target_link_libraries(feelcoin_genesis
+  PRIVATE
+    cryptonote_core
+    blockchain_db
+    version
+    epee
+    ${Boost_FILESYSTEM_LIBRARY}
+    ${Boost_SYSTEM_LIBRARY}
+    ${Boost_THREAD_LIBRARY}
+    ${CMAKE_THREAD_LIBS_INIT}
+    ${EXTRA_LIBRARIES})
+
+set_property(TARGET feelcoin_genesis
+  PROPERTY OUTPUT_NAME "feelcoin-genesis")

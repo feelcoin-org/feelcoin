@@ -118,3 +118,7 @@ nbproject
 __pycache__/
 *.pyc
 *.log
+
+# Feelcoin local development files
+feelcoin-backups/
+*.before-feelcoin*

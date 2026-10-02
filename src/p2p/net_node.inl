@@ -702,152 +702,15 @@ namespace nodetool
   template<class t_payload_net_handler>
   std::set<std::string> node_server<t_payload_net_handler>::get_ip_seed_nodes() const
   {
-    std::set<std::string> full_addrs;
-    if (m_nettype == cryptonote::TESTNET)
-    {
-      full_addrs.insert("176.9.0.187:28080");
-      full_addrs.insert("192.99.8.110:28080");
-      full_addrs.insert("37.187.74.171:28080");
-      full_addrs.insert("88.99.195.15:28080");
-      full_addrs.insert("5.104.84.64:28080");
-    }
-    else if (m_nettype == cryptonote::STAGENET)
-    {
-      full_addrs.insert("176.9.0.187:38080");
-      full_addrs.insert("192.99.8.110:38080");
-      full_addrs.insert("37.187.74.171:38080");
-      full_addrs.insert("88.99.195.15:38080");
-      full_addrs.insert("5.104.84.64:38080");
-    }
-    else if (m_nettype == cryptonote::FAKECHAIN)
-    {
-    }
-    else
-    {
-      full_addrs.insert("176.9.0.187:18080");
-      full_addrs.insert("88.198.163.90:18080");
-      full_addrs.insert("192.99.8.110:18080");
-      full_addrs.insert("37.187.74.171:18080");
-      full_addrs.insert("88.99.195.15:18080");
-      full_addrs.insert("5.104.84.64:18080");
-    }
-    return full_addrs;
+    // Feelcoin peers are configured explicitly until seeds are available.
+    return {};
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   std::set<std::string> node_server<t_payload_net_handler>::get_dns_seed_nodes()
   {
-    if (!m_exclusive_peers.empty() || m_offline)
-    {
-      return {};
-    }
-    if (m_nettype == cryptonote::TESTNET)
-    {
-      return get_ip_seed_nodes();
-    }
-    if (m_nettype == cryptonote::STAGENET)
-    {
-      return get_ip_seed_nodes();
-    }
-    if (m_nettype == cryptonote::FAKECHAIN)
-    {
-      return {};
-    }
-    if (!m_enable_dns_seed_nodes)
-    {
-      // TODO: a domain can be set through socks, so that the remote side does the lookup for the DNS seed nodes.
-      m_fallback_seed_nodes_added.test_and_set();
-      return get_ip_seed_nodes();
-    }
-
-    std::set<std::string> full_addrs;
-
-    // for each hostname in the seed nodes list, attempt to DNS resolve and
-    // add the result addresses as seed nodes
-    // TODO: at some point add IPv6 support, but that won't be relevant
-    // for some time yet.
-
-    struct frame_t
-    {
-      std::vector<std::vector<std::string>> dns_results;
-      boost::mutex sync;
-    };
-
-    const auto frame = std::make_shared<frame_t>();
-    frame->dns_results.resize(m_seed_nodes_list.size());
-
-    // some libc implementation provide only a very small stack
-    // for threads, e.g. musl only gives +- 80kb, which is not
-    // enough to do a resolve with unbound. we request a stack
-    // of 1 mb, which should be plenty
-    boost::thread::attributes thread_attributes;
-    thread_attributes.set_stack_size(1024*1024);
-
-    std::list<boost::thread> dns_threads;
-    uint64_t result_index = 0;
-    const std::weak_ptr<frame_t> frame_weak{frame};
-    for (const std::string& addr_str : m_seed_nodes_list)
-    {
-      boost::thread th = boost::thread(thread_attributes, [frame_weak, addr_str, result_index]
-      {
-        MDEBUG("dns_threads[" << result_index << "] created for: " << addr_str);
-        // TODO: care about dnssec avail/valid
-        bool avail, valid;
-        std::vector<std::string> addr_list = tools::DNSResolver::instance().get_ipv4(addr_str, avail, valid);
-        MINFO("dns_threads[" << result_index << "] addr_str: " << addr_str << "  number of results: " << addr_list.size());
-        const auto frame = frame_weak.lock();
-        if (frame)
-        {
-          const boost::lock_guard<boost::mutex> lock{frame->sync};
-          frame->dns_results.at(result_index) = std::move(addr_list);
-        }
-      });
-
-      dns_threads.push_back(std::move(th));
-      ++result_index;
-    }
-
-    MDEBUG("dns_threads created, now waiting for completion or timeout of " << CRYPTONOTE_DNS_TIMEOUT_MS << "ms");
-    boost::chrono::system_clock::time_point deadline = boost::chrono::system_clock::now() + boost::chrono::milliseconds(CRYPTONOTE_DNS_TIMEOUT_MS);
-    uint64_t i = 0;
-    for (boost::thread& th : dns_threads)
-    {
-      if (! th.try_join_until(deadline))
-      {
-        MWARNING("dns_threads[" << i << "] timed out");
-        th.detach();
-      }
-      ++i;
-    }
-
-    i = 0;
-    const boost::lock_guard<boost::mutex> lock{frame->sync};
-    for (const auto& result : frame->dns_results)
-    {
-      MDEBUG("DNS lookup for " << m_seed_nodes_list[i] << ": " << result.size() << " results");
-      // if no results for node, thread's lookup likely timed out
-      if (result.size())
-      {
-        for (const auto& addr_string : result)
-          full_addrs.insert(addr_string + ":" + std::to_string(cryptonote::get_config(m_nettype).P2P_DEFAULT_PORT));
-      }
-      ++i;
-    }
-
-    // append the fallback nodes if we have too few seed nodes to start with
-    if (full_addrs.size() < MIN_WANTED_SEED_NODES)
-    {
-      if (full_addrs.empty())
-        MINFO("DNS seed node lookup either timed out or failed, falling back to defaults");
-      else
-        MINFO("Not enough DNS seed nodes found, using fallback defaults too");
-
-      for (const auto &peer: get_ip_seed_nodes())
-        full_addrs.insert(peer);
-      m_fallback_seed_nodes_added.test_and_set();
-    }
-
-    return full_addrs;
+    // Do not discover peers through Monero DNS seeds.
+    return {};
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -2121,54 +1984,7 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::update_dns_blocklist()
   {
-    if (!m_enable_dns_blocklist)
-      return true;
-    if (m_nettype != cryptonote::MAINNET)
-      return true;
-
-    static const std::vector<std::string> dns_urls = {
-      "blocklist.moneropulse.se"
-    , "blocklist.moneropulse.org"
-    , "blocklist.moneropulse.net"
-    , "blocklist.moneropulse.co"
-    , "blocklist.moneropulse.fr"
-    , "blocklist.moneropulse.de"
-    , "blocklist.moneropulse.ch"
-    };
-
-    std::vector<std::string> records;
-    if (!tools::dns_utils::load_txt_records_from_dns(records, dns_urls))
-      return true;
-
-    unsigned good = 0, bad = 0;
-    for (const auto& record : records)
-    {
-      std::vector<std::string> ips;
-      boost::split(ips, record, boost::is_any_of(";"));
-      for (const auto &ip: ips)
-      {
-        if (ip.empty())
-          continue;
-        auto subnet = net::get_ipv4_subnet_address(ip);
-        if (subnet)
-        {
-          block_subnet(*subnet, DNS_BLOCKLIST_LIFETIME);
-          ++good;
-          continue;
-        }
-        const expect<epee::net_utils::network_address> parsed_addr = net::get_network_address(ip, 0);
-        if (parsed_addr)
-        {
-          block_host(*parsed_addr, DNS_BLOCKLIST_LIFETIME, true);
-          ++good;
-          continue;
-        }
-        MWARNING("Invalid IP address or subnet from DNS blocklist: " << ip << " - " << parsed_addr.error());
-        ++bad;
-      }
-    }
-    if (good > 0)
-      MINFO(good << " addresses added to the blocklist");
+    // No Feelcoin DNS blocklist provider configured.
     return true;
   }
   //-----------------------------------------------------------------------------------
