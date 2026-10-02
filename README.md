@@ -23,7 +23,7 @@ The Feelcoin ecosystem includes:
 
 Download the latest Feelcoin binaries from:
 
-https://github.com/feelcoin-dev/feelcoin/releases/latest
+https://github.com/feelcoin-org/feelcoin/releases/latest
 
 Included core binaries:
 
@@ -45,7 +45,7 @@ Main Feelcoin node and wallet implementation.
 
 Repository:
 
-https://github.com/feelcoin-dev/feelcoin
+https://github.com/feelcoin-org/feelcoin
 
 ---
 
@@ -55,7 +55,7 @@ Official RandomX mining pool for the Feelcoin network.
 
 Repository:
 
-https://github.com/feelcoin-dev/feelcoin-pool
+https://github.com/feelcoin-org/feelcoin-pool
 
 The pool provides:
 
@@ -82,7 +82,7 @@ Official Feelcoin blockchain explorer.
 
 Repository:
 
-https://github.com/feelcoin-dev/feelcoin-explorer
+https://github.com/feelcoin-org/feelcoin-explorer
 
 The explorer provides:
 
@@ -108,7 +108,7 @@ Official Feelcoin paper wallet generator.
 
 Repository:
 
-https://github.com/feelcoin-dev/feelcoin-paper-wallet
+https://github.com/feelcoin-org/feelcoin-paper-wallet
 
 Features include:
 
