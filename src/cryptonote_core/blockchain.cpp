@@ -43,6 +43,7 @@
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "cryptonote_basic/events.h"
 #include "cryptonote_config.h"
+#include "feelcoin_treasury.h"
 #include "cryptonote_basic/miner.h"
 #include "hardforks/hardforks.h"
 #include "misc_language.h"
@@ -1362,6 +1363,136 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     MERROR_VER("block weight " << cumulative_block_weight << " is bigger than allowed for this blockchain");
     return false;
   }
+  // -------------------------------------------------------------
+  // Feelcoin consensus-enforced development treasury
+  // -------------------------------------------------------------
+  const uint64_t miner_height =
+    boost::get<txin_gen>(b.miner_tx.vin[0]).height;
+
+  if (feelcoin_treasury::active(miner_height))
+  {
+    const uint64_t expected_treasury_reward =
+      feelcoin_treasury::reward(base_reward);
+
+    // Treasury-enabled coinbase:
+    //   output 0 -> miner/pool
+    //   output 1 -> Feelcoin treasury
+    if (b.miner_tx.vout.size() != 2)
+    {
+      MERROR_VER(
+        "Invalid Feelcoin coinbase output count at height "
+        << miner_height << ": expected 2, got "
+        << b.miner_tx.vout.size());
+      return false;
+    }
+
+    const tx_out &treasury_out = b.miner_tx.vout[1];
+
+    if (treasury_out.amount != expected_treasury_reward)
+    {
+      MERROR_VER(
+        "Invalid Feelcoin treasury amount at height "
+        << miner_height << ": expected "
+        << print_money(expected_treasury_reward)
+        << ", got "
+        << print_money(treasury_out.amount));
+      return false;
+    }
+
+    address_parse_info treasury_info;
+
+    if (!get_account_address_from_str(
+          treasury_info,
+          network_type::MAINNET,
+          feelcoin_treasury::ADDRESS))
+    {
+      MERROR_VER("Invalid hard-coded Feelcoin treasury address");
+      return false;
+    }
+
+    crypto::secret_key treasury_view_secret;
+
+    if (!epee::string_tools::hex_to_pod(
+          feelcoin_treasury::VIEW_SECRET_KEY,
+          treasury_view_secret))
+    {
+      MERROR_VER("Invalid hard-coded Feelcoin treasury view key");
+      return false;
+    }
+
+    const crypto::public_key tx_pub_key =
+      get_tx_pub_key_from_extra(b.miner_tx);
+
+    crypto::key_derivation treasury_derivation =
+      AUTO_VAL_INIT(treasury_derivation);
+
+    if (!crypto::generate_key_derivation(
+          tx_pub_key,
+          treasury_view_secret,
+          treasury_derivation))
+    {
+      MERROR_VER("Failed to derive Feelcoin treasury output");
+      return false;
+    }
+
+    crypto::public_key expected_treasury_key =
+      AUTO_VAL_INIT(expected_treasury_key);
+
+    if (!crypto::derive_public_key(
+          treasury_derivation,
+          1,
+          treasury_info.address.m_spend_public_key,
+          expected_treasury_key))
+    {
+      MERROR_VER("Failed to derive expected Feelcoin treasury key");
+      return false;
+    }
+
+    crypto::public_key actual_treasury_key =
+      AUTO_VAL_INIT(actual_treasury_key);
+
+    if (!get_output_public_key(
+          treasury_out,
+          actual_treasury_key))
+    {
+      MERROR_VER("Unable to read Feelcoin treasury output key");
+      return false;
+    }
+
+    if (actual_treasury_key != expected_treasury_key)
+    {
+      MERROR_VER(
+        "Coinbase treasury output does not belong to "
+        "the Feelcoin development treasury");
+      return false;
+    }
+
+    // When view tags are active, verify the treasury view tag too.
+    if (version >= HF_VERSION_VIEW_TAGS)
+    {
+      if (treasury_out.target.type() != typeid(txout_to_tagged_key))
+      {
+        MERROR_VER("Feelcoin treasury output has invalid output type");
+        return false;
+      }
+
+      crypto::view_tag expected_view_tag;
+      crypto::derive_view_tag(
+        treasury_derivation,
+        1,
+        expected_view_tag);
+
+      const auto &tagged =
+        boost::get<txout_to_tagged_key>(treasury_out.target);
+
+      if (tagged.view_tag != expected_view_tag)
+      {
+        MERROR_VER("Feelcoin treasury output has invalid view tag");
+        return false;
+      }
+    }
+  }
+
   if(base_reward + fee < money_in_use)
   {
     MERROR_VER("coinbase transaction spend too much money (" << print_money(money_in_use) << "). Block reward is " << print_money(base_reward + fee) << "(" << print_money(base_reward) << "+" << print_money(fee) << "), cumulative_block_weight " << cumulative_block_weight);
@@ -1683,7 +1814,11 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
    */
   //make blocks coin-base tx looks close to real coinbase tx to get truthful blob weight
   uint8_t hf_version = b.major_version;
-  size_t max_outs = hf_version >= 4 ? 1 : 11;
+  // Feelcoin treasury requires a second coinbase output after activation.
+  size_t max_outs =
+    feelcoin_treasury::active(height)
+      ? 2
+      : (hf_version >= 4 ? 1 : 11);
   bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, first chance");
   size_t cumulative_weight = txs_weight + get_transaction_weight(b.miner_tx);

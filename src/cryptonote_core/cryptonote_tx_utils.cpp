@@ -38,6 +38,8 @@ using namespace epee;
 #include "common/apply_permutation.h"
 #include "cryptonote_tx_utils.h"
 #include "cryptonote_config.h"
+#include "cryptonote_basic/cryptonote_basic_impl.h"
+#include "feelcoin_treasury.h"
 #include "blockchain.h"
 #include "cryptonote_basic/miner.h"
 #include "cryptonote_basic/tx_extra.h"
@@ -137,7 +139,19 @@ namespace cryptonote
     LOG_PRINT_L1("Creating block template: reward " << block_reward <<
       ", fee " << fee);
 #endif
-    block_reward += fee;
+    // Feelcoin development treasury:
+    // 2% of the BLOCK SUBSIDY goes to the treasury.
+    // Transaction fees remain 100% with the miner.
+    const uint64_t base_block_reward = block_reward;
+    const bool treasury_active = feelcoin_treasury::active(height);
+    const uint64_t treasury_reward =
+      treasury_active ? feelcoin_treasury::reward(base_block_reward) : 0;
+
+    const uint64_t miner_reward =
+      (base_block_reward - treasury_reward) + fee;
+
+    // Total coinbase value remains unchanged.
+    block_reward = base_block_reward + fee;
 
     // from hard fork 2, we cut out the low significant digits. This makes the tx smaller, and
     // keeps the paid amount almost the same. The unpaid remainder gets pushed back to the
@@ -150,9 +164,21 @@ namespace cryptonote
     }
 
     std::vector<uint64_t> out_amounts;
-    decompose_amount_into_digits(block_reward, hard_fork_version >= 2 ? 0 : ::config::DEFAULT_DUST_THRESHOLD,
-      [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
-      [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
+
+    if (treasury_active)
+    {
+      // Output 0 = miner/pool.
+      // Output 1 will be reserved for the Feelcoin treasury.
+      out_amounts.push_back(miner_reward);
+    }
+    else
+    {
+      decompose_amount_into_digits(
+        block_reward,
+        hard_fork_version >= 2 ? 0 : ::config::DEFAULT_DUST_THRESHOLD,
+        [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
+        [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
+    }
 
     CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
     if (height == 0 || hard_fork_version >= 4)
@@ -196,6 +222,86 @@ namespace cryptonote
       cryptonote::set_tx_out(amount, out_eph_public_key, use_view_tags, view_tag, out);
 
       tx.vout.push_back(out);
+    }
+
+    // Feelcoin development treasury output.
+    // Output 0 = miner/pool
+    // Output 1 = treasury
+    if (treasury_active)
+    {
+      address_parse_info treasury_info;
+
+      CHECK_AND_ASSERT_MES(
+        get_account_address_from_str(
+          treasury_info,
+          network_type::MAINNET,
+          feelcoin_treasury::ADDRESS),
+        false,
+        "Failed to parse Feelcoin treasury address");
+
+      CHECK_AND_ASSERT_MES(
+        !treasury_info.is_subaddress,
+        false,
+        "Feelcoin treasury address must be a standard address");
+
+      const size_t treasury_output_index = tx.vout.size();
+
+      CHECK_AND_ASSERT_MES(
+        treasury_output_index == 1,
+        false,
+        "Unexpected Feelcoin treasury output index");
+
+      crypto::key_derivation treasury_derivation =
+        AUTO_VAL_INIT(treasury_derivation);
+
+      crypto::public_key treasury_output_key =
+        AUTO_VAL_INIT(treasury_output_key);
+
+      bool r = crypto::generate_key_derivation(
+        treasury_info.address.m_view_public_key,
+        txkey.sec,
+        treasury_derivation);
+
+      CHECK_AND_ASSERT_MES(
+        r,
+        false,
+        "Failed to generate Feelcoin treasury key derivation");
+
+      r = crypto::derive_public_key(
+        treasury_derivation,
+        treasury_output_index,
+        treasury_info.address.m_spend_public_key,
+        treasury_output_key);
+
+      CHECK_AND_ASSERT_MES(
+        r,
+        false,
+        "Failed to derive Feelcoin treasury output key");
+
+      const bool use_view_tags =
+        hard_fork_version >= HF_VERSION_VIEW_TAGS;
+
+      crypto::view_tag treasury_view_tag;
+
+      if (use_view_tags)
+      {
+        crypto::derive_view_tag(
+          treasury_derivation,
+          treasury_output_index,
+          treasury_view_tag);
+      }
+
+      tx_out treasury_out;
+
+      cryptonote::set_tx_out(
+        treasury_reward,
+        treasury_output_key,
+        use_view_tags,
+        treasury_view_tag,
+        treasury_out);
+
+      tx.vout.push_back(treasury_out);
+      summary_amounts += treasury_reward;
     }
 
     CHECK_AND_ASSERT_MES(summary_amounts == block_reward, false, "Failed to construct miner tx, summary_amounts = " << summary_amounts << " not equal block_reward = " << block_reward);
