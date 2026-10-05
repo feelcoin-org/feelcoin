@@ -3,7 +3,7 @@
 **Project:** Feelcoin (FEEL)  
 **Motto:** *In Feels We Trust*  
 **Status:** Early-stage independent RandomX Proof-of-Work network  
-**Roadmap version:** October 2026
+**Roadmap version:** 5 October 2026
 
 > This roadmap describes current development direction. It is not a promise of fixed dates, market outcomes, exchange listings, or future value.
 
@@ -45,10 +45,23 @@ Consensus economics and operational infrastructure strengthened.
 
 Current priority.
 
-- Publish Feelcoin Whitepaper v1.0
+### Public Ecosystem Infrastructure ✅
+
+- Official project website: https://feelcoin.org
+- Mining pool: https://pool.feelcoin.org
+- Blockchain explorer: https://explorer.feelcoin.org
+- Non-custodial Web Wallet: https://wallet.feelcoin.org
+- Paper Wallet: https://paper.feelcoin.org
+- Standard RandomX mining endpoint: `pool.feelcoin.org:4242`
+- TLS mining endpoint: `pool.feelcoin.org:4244`
+- HTTPS/TLS deployment across public services
+- Mobile-responsive ecosystem navigation
+- GitHub repositories and public documentation standardized around the canonical `feelcoin.org` domain
+- Feelcoin Technical Whitepaper v1.2 published
+
+### Current Work
+
 - Publish Bitcointalk ANN and mining guide
-- Improve public documentation across all repositories
-- Add HTTPS and domain-based public services
 - Improve miner onboarding and troubleshooting guides
 - Publish clearer wallet backup and recovery guidance
 - Improve paper-wallet security toward offline/client-side generation
@@ -97,6 +110,7 @@ Feelcoin development follows several standing principles:
 - Core: https://github.com/feelcoin-org/feelcoin
 - Mining Pool: https://github.com/feelcoin-org/feelcoin-pool
 - Explorer: https://github.com/feelcoin-org/feelcoin-explorer
+- Web Wallet: https://github.com/feelcoin-org/feelcoin-web-wallet
 - Paper Wallet: https://github.com/feelcoin-org/feelcoin-paper-wallet
 - v0.2.0 Release: https://github.com/feelcoin-org/feelcoin/releases/tag/v0.2.0
 
