@@ -343,3 +343,9 @@ Current ecosystem components include:
 ---
 
 ## In Feels We Trust
+
+## Contact
+
+Official Feelcoin support and project contact:
+
+**support@feelcoin.org**
