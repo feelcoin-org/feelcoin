@@ -702,15 +702,23 @@ namespace nodetool
   template<class t_payload_net_handler>
   std::set<std::string> node_server<t_payload_net_handler>::get_ip_seed_nodes() const
   {
-    // Feelcoin peers are configured explicitly until seeds are available.
+    if (m_nettype == cryptonote::MAINNET)
+    {
+      return {
+        "162.35.27.43:35780",   // node1.feelcoin.org
+        "129.121.148.149:35780" // node2.feelcoin.org
+      };
+    }
+
     return {};
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   std::set<std::string> node_server<t_payload_net_handler>::get_dns_seed_nodes()
   {
-    // Do not discover peers through Monero DNS seeds.
-    return {};
+    // Feelcoin currently uses its own fixed bootstrap nodes.
+    // Never fall back to Monero DNS seeds.
+    return get_ip_seed_nodes();
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
