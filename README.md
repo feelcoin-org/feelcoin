@@ -1,6 +1,39 @@
 # Feelcoin
 
 <!-- FEELCOIN-OFFICIAL-LINKS:START -->
+
+<!-- FEELCOIN-LATEST-RELEASE-START -->
+
+## Latest Stable Release — v0.2.1
+
+**Feelcoin Core v0.2.1** is now available for Linux x86_64.
+
+This release improves network bootstrap and allows new Feelcoin nodes to
+automatically discover the mainnet through the official bootstrap nodes.
+
+- **Linux x86_64:** [Download v0.2.1](https://github.com/feelcoin-org/feelcoin/releases/download/v0.2.1/feelcoin-v0.2.1-linux-x64.tar.gz)
+- **Release notes:** [Feelcoin Core v0.2.1](https://github.com/feelcoin-org/feelcoin/releases/tag/v0.2.1)
+- **SHA256 file:** [Download checksum](https://github.com/feelcoin-org/feelcoin/releases/download/v0.2.1/feelcoin-v0.2.1-linux-x64.tar.gz.sha256)
+
+**SHA256**
+
+```text
+162b89f887e9df7572447c0d650fd8ed97f494cf97ccc17a9477ae214bf5adb1
+```
+
+### Official bootstrap nodes
+
+```text
+node1.feelcoin.org:35780
+node2.feelcoin.org:35780
+```
+
+No consensus rules, mining algorithm, rewards, address formats, or emission
+parameters changed in v0.2.1. Existing pool miners do not need to update.
+
+<!-- FEELCOIN-LATEST-RELEASE-END -->
+
+
 ## Official Feelcoin Ecosystem
 
 | Service | Official address |
