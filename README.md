@@ -56,6 +56,45 @@ TLS mining: `pool.feelcoin.org:4244`
 
 ![Feelcoin Logo](https://i.imgur.com/VPorAY4.jpeg)
 
+## Official Feelcoin Miner
+
+The official Feelcoin miner is maintained as a separate open-source repository:
+
+**Repository:** https://github.com/feelcoin-org/feelcoin-miner
+
+**Latest release:** https://github.com/feelcoin-org/feelcoin-miner/releases/tag/v0.1.0
+
+### Quick Start
+
+Pool mining:
+
+```bash
+./feelcoin-miner --wallet YOUR_FEEL_ADDRESS --worker YOUR_WORKER_NAME
+```
+
+This connects to the official TLS mining pool:
+
+```text
+pool.feelcoin.org:4244
+```
+
+Local solo mining:
+
+```bash
+./feelcoin-miner --solo --wallet YOUR_FEEL_ADDRESS
+```
+
+Custom/private daemon mining:
+
+```bash
+./feelcoin-miner --daemon --url YOUR_DAEMON_IP:35781 --wallet YOUR_FEEL_ADDRESS
+```
+
+> Keep daemon RPC private. Do not expose port 35781 directly to the public Internet.
+
+The miner uses an XMRig-derived RandomX engine with upstream attribution preserved.
+
+---
 ## Support Feelcoin Development
 
 Feelcoin is an open-source project.
