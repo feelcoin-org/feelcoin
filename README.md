@@ -95,6 +95,7 @@ Custom/private daemon mining:
 The miner uses an XMRig-derived RandomX engine with upstream attribution preserved.
 
 ---
+
 ## Support Feelcoin Development
 
 Feelcoin is an open-source project.
@@ -128,6 +129,7 @@ Donations are entirely voluntary and do not provide ownership, governance rights
 These voluntary donation addresses are separate from the consensus-enforced Feelcoin development treasury.
 
 ---
+
 ## In Feels We Trust
 
 Feelcoin is an independent RandomX Proof-of-Work cryptocurrency derived from Monero technology.
