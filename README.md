@@ -43,6 +43,20 @@ parameters changed in v0.2.1. Existing pool miners do not need to update.
 | Block Explorer | https://explorer.feelcoin.org |
 | Non-Custodial Web Wallet | https://wallet.feelcoin.org |
 | Paper Wallet | https://paper.feelcoin.org |
+| Public Data API | https://api.feelcoin.org/docs |
+
+### Developer API for exchanges and mining directories
+
+The official **read-only Feelcoin Public API v1** is available at **https://api.feelcoin.org**.
+
+- **[Developer documentation](https://api.feelcoin.org/docs)**
+- **[OpenAPI specification](https://api.feelcoin.org/openapi.json)**
+- **[Network statistics](https://api.feelcoin.org/v1/network)**
+- **[Official mining pool statistics](https://api.feelcoin.org/v1/mining/stats)**
+- **[Public integration summary](https://api.feelcoin.org/v1/integrations/summary)**
+- **[Exchange and directory integration guide](docs/PUBLIC_API.md)**
+
+This public statistics API is **not** an exchange wallet or a deposit/withdrawal interface. Platforms must integrate Feelcoin node and wallet software separately for fund movements.
 
 ### Mining endpoints
 
