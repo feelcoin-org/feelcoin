@@ -1,5 +1,9 @@
 # Feelcoin
 
+<p align="center">
+  <a href="https://feelcoin.org"><img src="https://feelcoin.org/assets/feelcoin-logo-v2.png" alt="Official Feelcoin logo" width="144"></a>
+</p>
+
 <!-- FEELCOIN-OFFICIAL-LINKS:START -->
 
 <!-- FEELCOIN-LATEST-RELEASE-START -->
@@ -68,7 +72,6 @@ TLS mining: `pool.feelcoin.org:4244`
 <!-- FEELCOIN-OFFICIAL-LINKS:END -->
 
 
-![Feelcoin Logo](https://i.imgur.com/VPorAY4.jpeg)
 
 ## Official Feelcoin Miner
 
