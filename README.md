@@ -59,6 +59,7 @@ The official **read-only Feelcoin Public API v1** is available at **https://api.
 - **[Official mining pool statistics](https://api.feelcoin.org/v1/mining/stats)**
 - **[Public integration summary](https://api.feelcoin.org/v1/integrations/summary)**
 - **[Exchange and directory integration guide](docs/PUBLIC_API.md)**
+- **[Exchange and wallet integration guide](docs/EXCHANGE_INTEGRATION.md)**
 
 This public statistics API is **not** an exchange wallet or a deposit/withdrawal interface. Platforms must integrate Feelcoin node and wallet software separately for fund movements.
 
