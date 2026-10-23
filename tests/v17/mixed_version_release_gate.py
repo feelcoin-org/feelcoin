@@ -308,7 +308,53 @@ def run_mixed(old, new):
          "Old node unexpectedly followed v17 after fork")
     print(f"PASS: two v17 nodes agree at height {final_tip[0]}, legacy v16 "
           f"remains at height 120", flush=True)
-    print("PASS: Stage 8 mixed-version activation and legacy rejection", flush=True)
+
+    print("=== Complete treasury activation and RandomX seed epoch rehearsal ===",
+          flush=True)
+    # The real 2% treasury rule starts at height 590, independently from
+    # the v17 test-fork height 120. Mine up to 591 with fixed-difficulty 1:
+    # validates the RandomX seed transition at 512 and treasury enforcement
+    # on both candidate daemons without any mainnet mining.
+    while current_height(PORT_NEW_B[1]) < 591:
+        h = current_height(PORT_NEW_B[1])
+        blocks = min(20, 591 - h)
+        lab.mine(PORT_NEW_B[1], blocks, payout, 120000 + h)
+        if current_height(PORT_NEW_B[1]) % 100 < 20:
+            print(f"  verified synthetic v17 height {current_height(PORT_NEW_B[1])}",
+                  flush=True)
+    final_tip = lab.current_tip(PORT_NEW_B[1])
+    wait_for(lambda: lab.current_tip(PORT_NEW_A[1]) == final_tip,
+             "v17 upgraded peers failed to converge through treasury activation",
+             seconds=240)
+    must(current_height(PORT_OLD[1]) == 120,
+         "Obsolete node unexpectedly followed new v17 test chain")
+    def outputs(height):
+        raw = rpc(PORT_NEW_B[1], "get_block", {"height": height})
+        block = json.loads(raw["json"])
+        values = [int(item["amount"]) for item in block["miner_tx"]["vout"]]
+        reported = int(lab.header(PORT_NEW_B[1], height)["reward"])
+        must(sum(values) == reported,
+             f"Coinbase output sum mismatch at height {height}")
+        return values
+    pre = outputs(589)
+    active = outputs(590)
+    post = outputs(591)
+    must(len(pre) == 1 and len(active) == 2 and len(post) == 2,
+         "Treasury activation must switch exactly at block 590")
+    for height, amounts in ((590, active), (591, post)):
+        expected_treasury = sum(amounts) * 2 // 100
+        must(amounts[1] == expected_treasury,
+             f"Height {height} treasury output not 2% of block subsidy")
+        must(amounts[0] > amounts[1],
+             f"Height {height} miner must receive more than treasury")
+    print("PASS: v17 nodes synchronized through RandomX seed epoch height 512",
+          flush=True)
+    print("PASS: height 589 one coinbase output; heights 590/591 two outputs",
+          flush=True)
+    print("PASS: consensus treasury allocation exactly 2% of fakechain subsidy",
+          flush=True)
+    print("PASS: Stage 8 mixed-version activation, P2P and economics checks",
+          flush=True)
     print("LIMIT: all on isolated two-node/legacy fakechain with fixed difficulty 1.",
           flush=True)
     print("NO MAINNET ACTIVATION, NO NODE UPGRADE, WINDOWS TEST DELEGATED TO USER.",
