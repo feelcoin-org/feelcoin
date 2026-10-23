@@ -27,22 +27,28 @@ HOST="$(hostname -f 2>/dev/null || hostname)"
 case "$HOST" in
   *node1.feelcoin.org*|*node2.feelcoin.org*) fail "Production Feelcoin host." ;;
 esac
+# A disabled, inactive feelcoin-miner.service is harmless. Refuse only
+# active production-like daemon, pool or node services, and running daemons.
 if pgrep -x feelcoind >/dev/null 2>&1 ||
-   systemctl --no-pager --plain list-units --all --type=service 2>/dev/null |
-      grep -Ei 'feelcoin.*service' >/dev/null; then
-  fail "Existing Feelcoin daemon/service found: use another VPS."
+   systemctl --no-pager --plain list-units --state=running --type=service 2>/dev/null |
+      grep -Eiq 'feelcoin.*(daemon|node|pool).*service'; then
+  fail "An active Feelcoin daemon, node or pool was detected. Use another VPS."
 fi
 if ss -ltn | grep -Eq ':(35780|35781|35782)[[:space:]]'; then
   fail "Production-like Feelcoin port detected."
 fi
 
-say "Install build dependencies on the dedicated lab VPS"
-sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  build-essential cmake git pkg-config python3 ca-certificates \
-  libboost-all-dev libunbound-dev libunwind-dev libssl-dev \
-  libzmq3-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev \
-  libprotobuf-dev protobuf-compiler libreadline-dev libgtest-dev
+if [[ "${V17_SKIP_APT:-0}" == "1" ]]; then
+  say "Build dependencies already installed by the VPS administrator"
+else
+  say "Install build dependencies on the dedicated lab VPS"
+  sudo apt-get update
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential cmake git pkg-config python3 ca-certificates \
+    libboost-all-dev libunbound-dev libssl-dev \
+    libzmq3-dev libsodium-dev libhidapi-dev libusb-1.0-0-dev \
+    libprotobuf-dev protobuf-compiler libreadline-dev libgtest-dev
+fi
 
 say "Build an isolated daemon and unit tests"
 git -C "$SOURCE" submodule update --init --recursive
