@@ -64,6 +64,8 @@ def prepare():
         (ROOT / ".feelcoin-v17-mixed-lab").write_text(MARKER_TEXT)
     must(ROOT.is_dir() and ROOT.stat().st_uid == os.geteuid(),
          "Mixed lab owner mismatch")
+    must(shutil.disk_usage(ROOT).free > 6 * 1024**3,
+         "Need at least 6GB free disk to safely build old v16 and run tests")
     must((ROOT / ".feelcoin-v17-mixed-lab").read_text() == MARKER_TEXT,
          "Mixed lab ownership marker missing")
 
@@ -95,7 +97,6 @@ def prepare():
     base_cfg = (REF_SRC / "src/cryptonote_config.h").read_text()
     for field in ("GENESIS_TX", "GENESIS_NONCE", "NETWORK_ID"):
         if field == "GENESIS_TX":
-            exp = r'STD_NOT_REAL'
             old_val = re.search(r'GENESIS_TX\s*=\s*"([^"]+)"', base_cfg)
             new_val = re.search(r'GENESIS_TX\s*=\s*"([^"]+)"', new_cfg)
         elif field == "GENESIS_NONCE":
@@ -236,16 +237,16 @@ def run_mixed(old, new):
     print("PASS: authentic pinned-v16 test history through height 119",
           flush=True)
 
-    v16_data = path / "old_v16" / "data"
-    new_a_data = path / "new_v17_a" / "data"
-    new_b_data = path / "new_v17_b" / "data"
-    # Fresh replay data each run: reject preexisting target directory rather
-    # than delete an unverified directory or touch any user-owned chain.
-    for d in (v16_data, new_a_data, new_b_data):
-        must(not d.exists() and not d.is_symlink(),
-             f"Mixed test data already exists: {d}. Use another isolated lab.")
+    import tempfile
+    run_root = pathlib.Path(tempfile.mkdtemp(prefix="mixed-run-", dir=ROOT))
+    v16_data = run_root / "old_v16" / "data"
+    new_a_data = run_root / "new_v17_a" / "data"
+    new_b_data = run_root / "new_v17_b" / "data"
+    # A new uniquely named fakechain each run allows safe recovery after a
+    # failed test, without deleting any existing blockchain directory.
     for d in (v16_data, new_a_data, new_b_data):
         shutil.copytree(old_seed, d)
+    print(f"Fresh isolated chain copies: {run_root}", flush=True)
 
     print("=== Boot original v16 plus two upgraded-v17 peers ===", flush=True)
     start(old, v16_data, "old_v16", PORT_OLD, peers=(PORT_NEW_A[0],))
