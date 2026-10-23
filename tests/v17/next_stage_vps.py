@@ -108,7 +108,7 @@ def rpc(port, method, params=None, timeout=90):
     return result
 
 
-def start_node(daemon, root, label, ports, fixed=True):
+def start_node(daemon, root, label, ports, fixed=True, log_level=None):
     data = root / label / "data"
     shutil.copytree(SEED_LAB / "data", data)
     stdout_path = root / f"{label}.stdout"
@@ -127,6 +127,8 @@ def start_node(daemon, root, label, ports, fixed=True):
     ]
     if fixed:
         argv += ["--fixed-difficulty", "1"]
+    if log_level is not None:
+        argv += ["--log-level", log_level]
     proc = subprocess.Popen(argv, stdout=stream, stderr=subprocess.STDOUT,
                             start_new_session=True)
     PROCS.append((proc, label))
