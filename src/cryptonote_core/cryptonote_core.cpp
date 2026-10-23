@@ -669,7 +669,13 @@ namespace cryptonote
       MERROR("Failed to parse block rate notify spec: " << e.what());
     }
 
-    const std::pair<uint8_t, uint64_t> regtest_hard_forks[3] = {std::make_pair(1, 0), std::make_pair(mainnet_hard_forks[num_mainnet_hard_forks-1].version, 1), std::make_pair(0, 0)};
+    // ISOLATED v17 REGTEST ONLY. Deliberately never merged into mainnet.
+// This fakechain schedule gives a local fork boundary without modifying the
+// production network or its mainnet/testnet/stagenet hard-fork schedules.
+const std::pair<uint8_t, uint64_t> regtest_hard_forks[4] = {
+  std::make_pair(1, 0), std::make_pair(uint8_t(16), 1),
+  std::make_pair(uint8_t(17), 120), std::make_pair(0, 0)
+};
     const cryptonote::test_options regtest_test_options = {
       regtest_hard_forks,
       0
