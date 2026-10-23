@@ -187,6 +187,42 @@ def current_height(port):
     return lab.current_tip(port)[0]
 
 
+def peer_counts(port):
+    info = rpc(port, "get_info", timeout=8)
+    incoming = int(info.get("incoming_connections_count", 0))
+    outgoing = int(info.get("outgoing_connections_count", 0))
+    return incoming, outgoing
+
+
+def mixed_peers_ready():
+    old_in, old_out = peer_counts(PORT_OLD[1])
+    a_in, a_out = peer_counts(PORT_NEW_A[1])
+    b_in, b_out = peer_counts(PORT_NEW_B[1])
+    # Mutually dialing nodes may keep only incoming connections.
+    # Three-node exclusive topology: old <-> A <-> B.
+    return (old_in + old_out >= 1 and
+            a_in + a_out >= 2 and
+            b_in + b_out >= 1)
+
+
+def print_peer_diagnostics():
+    for name, port in (("old_v16", PORT_OLD[1]),
+                       ("new_v17_a", PORT_NEW_A[1]),
+                       ("new_v17_b", PORT_NEW_B[1])):
+        try:
+            incoming, outgoing = peer_counts(port)
+            print(f"  {name}: incoming={incoming}, outgoing={outgoing}",
+                  flush=True)
+            connections = rpc(port, "get_connections", timeout=8)
+            for connection in connections.get("connections", []):
+                print(f"    peer={connection.get('peer_id', '?')} "
+                      f"address={connection.get('address', '?')} "
+                      f"incoming={connection.get('incoming', '?')}",
+                      flush=True)
+        except Exception as exc:
+            print(f"  {name}: peer diagnostics unavailable: {exc}", flush=True)
+
+
 def prove_rejection(port, blob, expected_tip):
     try:
         rpc(port, "submit_block", [blob], timeout=40)
@@ -257,13 +293,15 @@ def run_mixed(old, new):
     for p in (PORT_OLD[1], PORT_NEW_A[1], PORT_NEW_B[1]):
         must(current_height(p) == 119,
              f"Node RPC port {p} not at pre-fork height 119")
-    wait_for(lambda: int(rpc(PORT_OLD[1], "get_info").get(
-                "outgoing_connections_count", 0)) >= 1 and
-             int(rpc(PORT_NEW_A[1], "get_info").get(
-                 "outgoing_connections_count", 0)) >= 1 and
-             int(rpc(PORT_NEW_B[1], "get_info").get(
-                 "outgoing_connections_count", 0)) >= 1,
-             "Old/new P2P handshake before fork did not connect", seconds=180)
+    try:
+        wait_for(mixed_peers_ready,
+                 "Old/new P2P handshake before fork did not connect",
+                 seconds=180)
+    except Exception:
+        print("=== P2P handshake failure diagnostics ===", flush=True)
+        print_peer_diagnostics()
+        raise
+    print_peer_diagnostics()
     print("PASS: v16 and v17 nodes share identical pre-fork tip and P2P links",
           flush=True)
 
