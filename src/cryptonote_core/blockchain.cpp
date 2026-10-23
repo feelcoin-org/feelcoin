@@ -45,6 +45,7 @@
 #include "cryptonote_config.h"
 #include "feelcoin_treasury.h"
 #include "cryptonote_basic/feelcoin_lwma.h"
+#include "cryptonote_basic/feelcoin_timestamp_rules.h"
 #include "cryptonote_basic/miner.h"
 #include "hardforks/hardforks.h"
 #include "misc_language.h"
@@ -4116,6 +4117,16 @@ uint64_t Blockchain::get_adjusted_time(uint64_t height) const
 bool Blockchain::check_block_timestamp(std::vector<uint64_t>& timestamps, const block& b, uint64_t& median_ts) const
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
+  // On alternative chains v17 uses the same future-time tolerance as
+  // the main chain. Historical pre-v17 behavior is intentionally unchanged.
+  // Callers validate the block's hardfork version before reaching here.
+  if (b.major_version >= HF_VERSION_FEELCOIN_LWMA &&
+      !feelcoin_timestamp_within_future_limit(
+        b.timestamp, static_cast<uint64_t>(time(NULL)), b.major_version))
+  {
+    MERROR_VER("Feelcoin v17 alternative block timestamp exceeds future tolerance");
+    return false;
+  }
   median_ts = epee::misc_utils::median(timestamps);
 
   if(b.timestamp < median_ts)
@@ -4137,13 +4148,16 @@ bool Blockchain::check_block_timestamp(std::vector<uint64_t>& timestamps, const 
 bool Blockchain::check_block_timestamp(const block& b, uint64_t& median_ts) const
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
-  if(b.timestamp > (uint64_t)time(NULL) + CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT)
+  const auto h = m_db->height();
+  const auto timestamp_rules_version = get_ideal_hard_fork_version(h);
+  if (!feelcoin_timestamp_within_future_limit(
+        b.timestamp, static_cast<uint64_t>(time(NULL)), timestamp_rules_version))
   {
-    MERROR_VER("Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than local time + 2 hours");
+    MERROR_VER("Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp
+      << ", exceeds the permitted future tolerance for consensus version "
+      << static_cast<unsigned>(timestamp_rules_version));
     return false;
   }
-
-  const auto h = m_db->height();
 
   // if not enough blocks, no proper median yet, return true
   if(h < BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW)
