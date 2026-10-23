@@ -48,7 +48,8 @@ def rpc(method, params=None):
     )
     with urllib.request.urlopen(request, timeout=8) as result:
         body = json.load(result)
-    require("error" not in body, f"RPC {method} error: {body['error']}")
+    if body.get("error"):
+        raise RuntimeError(f"RPC {method} error: {body['error']}")
     return body["result"]
 
 
