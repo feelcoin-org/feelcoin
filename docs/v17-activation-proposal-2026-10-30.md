@@ -1,42 +1,32 @@
-# Feelcoin v17 — provisional October 30, 2026 activation proposal
+# Feelcoin v17 — provisional October 30, 2026 activation (revised)
 
-**STATUS: PROPOSAL ONLY — NOT SCHEDULED IN CONSENSUS CODE.**
-No v17 activation entry has been inserted into `src/hardforks/hardforks.cpp`. No production release is authorized by this document.
+**STATUS: PROPOSAL ONLY — NOT SCHEDULED IN CONSENSUS CODE; NOT RELEASED.**
 
-## Reference chain snapshot
+## Observed live chain speed, not the 120-second target
 
-- Source: https://api.feelcoin.org/v1/network
-- Observed 2026-10-23T09:54:33Z: chain height **15,489**, tip height **15,488**, target interval **120 seconds**.
-- Candidate activation: **block 20,500**.
-- From tip height 15,488, 5,012 block discoveries are needed through block 20,500 inclusive.
-- At nominal target: 5,012 × 120 seconds = 601,440 seconds = **6 days, 23 hours, 4 minutes**.
-- Reference projected time: **2026-10-30 ~08:58 UTC / 09:58 Algeria time**.
-- **This date is not guaranteed.** The live network has experienced difficulty/interval volatility and can reach height 20,500 earlier or later.
+- Public API: [network](https://api.feelcoin.org/v1/network) and [latest block timestamps](https://api.feelcoin.org/v1/blocks/latest).
+- Snapshot as of **2026-10-23 10:49 UTC**: tip height **15,508**.
+- Latest 10 consecutive headers: block **15,499 at 1792750262** and block **15,508 at 1792752144**.
+- Average of 9 actual intervals: **1,882 / 9 = 209.11 seconds/block**.
+- A seven-day projection at this *observed* pace: **604,800 / 209.11 ≈ 2,892 blocks**, giving **candidate fork height 18,400**.
+- Approximate activation: **October 30 around 10:41 UTC (11:41 Algeria)** if the mean stays unchanged.
+- Former proposed height 20,500 would take approximately **12.1 days** at this pace; **superseded**.
 
-## Desired communication timeline (conditional)
+**High uncertainty**: Nine block intervals are too few for a reliable 7-day forecast in probabilistic mining. A stable 24–72-hour rolling sample with reorg handling should be used before freezing the height. If hashrate recovers toward the 120-second target, block 18,400 could arrive after only ~4 days. A height lock cannot guarantee a full seven-day warning. If adequate upgrade notice is required, select a later activation height and announce it only with tested release binaries.
 
-- October 23: aim to publish a **tested, signed, activation-height-configured final v17 upgrade** only if all consensus-critical checks, testnet validation, builds, and network coordination have passed. Announce the exact height, requirements, compatible miners/pools, and upgrade instructions. Otherwise communicate a progress update, not a mandatory release.
-- Before the fork: independent pools and node operators validate upgrade, check node peers and chain tips, and explicitly acknowledge readiness. Complete testnet runs/reorg tests and ensure a viable network path.
-- Before the **final** release: commit the confirmed activation height into mainnet consensus schedule, review the resulting binary and test its exact activation boundary, produce/verify release artifacts, and publish an unambiguous official upgrade notice. Never distribute software with an unreviewed activation.
-- October 30: height 20,500 becomes effective **only if** the final, fully tested v17 release has been shipped with the exact scheduled activation and operators have had approximately seven days' notice. **If the final release is not ready on October 23, select and announce a later activation height rather than compressing the community's upgrade window.**
+## Windows-only Core candidate for antivirus evaluation
 
-## Mandatory release gates
+- Dedicated CI recipe: [v17-windows-candidate.yml](../.github/workflows/v17-windows-candidate.yml) runs on Windows with MSYS2, builds native x64, stages **only** `feelcoind.exe`, `feelcoin-wallet-cli.exe`, and `feelcoin-wallet-rpc.exe` plus README/SHA256.
+- Excludes Linux executables, Linux source trees, .so, .AppImage, .deb and shell scripts from the final candidate ZIP by explicit allowlist and archive inspection.
+- **Unsigned, unreleased QA artifact only**. GitHub Actions must successfully complete the build before any ZIP is available; verify hashes, test Windows Defender/SmartScreen while protection is enabled, and avoid running against valuable production wallet keys.
+- Removing Linux files from a distribution ZIP alone does **not** guarantee that antivirus warnings disappear; code signing, reproducibility and vendor false-positive review may still be necessary.
 
-- All required CI build/test jobs green, including native Linux & Windows; compatible macOS where distributed.
-- Historical v16 blockchain replay is byte-for-byte/consensus-identical through height H-1.
-- LWMA v17 difficulty calculation and timestamp rules produce deterministic accepted/rejected results at H, H+1, and across alternate-chain reorganizations crossing H.
-- No unexpected changes to RandomX, block target, 12 decimals, tail emission, 2% consensus-enforced treasury, addresses, balances, miner/pool reward calculation.
-- Full-node testnet including mining pools, solo miners, wallet backends, and a previously v16-only node upgrading.
-- Confirm signed release artifacts, reproducible checksums, documented upgrade/rollback-before-fork procedure, and upgraded nodes/pools reaching expected hashpower.
-- No unresolved consensus-critical vulnerabilities. Independently review the change set.
-- Upgrade-notice lead time is sufficient in practice. **If not, postpone activation.** Never force an untested change merely to meet the calendar.
+## Release gates before scheduling activation
 
-## Miners and pools
+- Finish the consensus changes and testnet validation (LWMA, timestamp policy, branch/reorg handling, treasury invariants and emission).
+- CI Linux, Windows, and unit tests green; validate the exact packaged executable from the final release branch.
+- Coordinate upgraded nodes/pools, mining compatibility, and one-week community notice.
+- Only then commit an agreed future activation height to the mainnet hardfork schedule, test that exact height, and publish signed/checksummed release binaries.
+- If release or reviews are delayed, **recalculate a later fork height** and preserve the intended notice window. Do not set height 18,400 in code merely because this document mentions it.
 
-- Pool miners using unchanged RandomX and a compatible Stratum implementation usually do not need to replace their miner binary, but this must be **validated** against upgraded pools.
-- Pool operators and direct daemon/solo operators **must upgrade their consensus daemon** before activation. Pool compatibility has to be verified and any required pool update distributed.
-- Node upgrades before block H must preserve v16 behavior until H. Non-upgraded nodes may follow an incompatible chain after H.
-
-## Suggested public announcement draft (DO NOT POST UNTIL RELEASE IS VERIFIED)
-
-> Feelcoin Core v0.3.0 — v17 upgrade preparation: proposed activation at block **20,500** (approximately October 30, 2026; actual time depends on mining). Node and pool operators will need to upgrade before activation. RandomX and wallet addresses remain unchanged, and 2% of the block subsidy continues to go to the treasury. We will publish verified binaries, checksums, instructions and the confirmed activation height after testing is complete. **Until the final release notice, this height is provisional.**
+This plan never modifies current mainnet consensus by itself.
