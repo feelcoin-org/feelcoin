@@ -1,0 +1,118 @@
+name: v17 Windows Core candidate (AV evaluation)
+
+# Isolated unsigned QA package only; never publishes a GitHub release or
+# schedules a hard fork. Package contains Windows executables, not source code.
+on:
+  push:
+    branches:
+      - feature/v17-consensus-audit
+    paths:
+      - '.github/workflows/v17-windows-candidate.yml'
+      - 'src/**'
+      - 'cmake/**'
+      - 'external/**'
+      - 'contrib/**'
+      - 'CMakeLists.txt'
+      - 'Makefile'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-candidate:
+    name: Windows x64 Core — unsigned candidate
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          cache: false
+          install: >-
+            mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-boost mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-zeromq mingw-w64-x86_64-libsodium
+            mingw-w64-x86_64-hidapi mingw-w64-x86_64-protobuf-c
+            mingw-w64-x86_64-libusb mingw-w64-x86_64-unbound git
+
+      - name: Compile Windows Core executables
+        run: |
+          make release-static-win64 -j2
+
+      - name: Stage ONLY native Windows binaries and generate SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $source = "build/release/bin"
+          if (!(Test-Path $source)) { throw "Windows build output missing: $source" }
+          $stage = "windows-candidate"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $allow = @("feelcoind.exe", "feelcoin-wallet-cli.exe", "feelcoin-wallet-rpc.exe")
+          foreach ($filename in $allow) {
+            $matches = @(Get-ChildItem -Path $source -Recurse -File -Filter $filename)
+            if ($matches.Count -ne 1) { throw "Expected exactly one $filename, found $($matches.Count)" }
+            $file = $matches[0]
+            $stream = [System.IO.File]::OpenRead($file.FullName)
+            try {
+              if ($stream.ReadByte() -ne 77 -or $stream.ReadByte() -ne 90) {
+                throw "Not a Windows PE executable: $filename"
+              }
+            }
+            finally { $stream.Dispose() }
+            Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $stage $filename)
+          }
+          @'
+          FEELCOIN CORE v17 — WINDOWS x64 UNSIGNED CANDIDATE
+          =================================================
+          FOR SECURITY / ANTIVIRUS EVALUATION ONLY.
+          NOT A FINAL MAINNET UPGRADE; v17 activation is NOT scheduled.
+          Do not replace a production node or import real wallet keys here.
+          This package includes ONLY .exe binaries plus this text and checksums.
+          GitHub branch: feature/v17-consensus-audit
+          Test Windows Defender/SmartScreen with protection kept enabled.
+          An unsigned binary may raise reputation warnings unrelated to sources.
+          A successful antivirus scan does not establish consensus safety.
+          '@ | Set-Content -Path (Join-Path $stage "README-CANDIDATE.txt") -Encoding ascii
+          $hashLines = @()
+          foreach ($filename in $allow) {
+            $digest = (Get-FileHash (Join-Path $stage $filename) -Algorithm SHA256).Hash.ToLowerInvariant()
+            $hashLines += "$digest  $filename"
+          }
+          $hashLines | Set-Content -Path (Join-Path $stage "SHA256SUMS.txt") -Encoding ascii
+          $zipName = "feelcoin-core-v17-win64-UNSIGNED-CANDIDATE.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zipName -CompressionLevel Optimal
+          Add-Type -AssemblyName System.IO.Compression
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipName))
+          try {
+            $archiveNames = @($zip.Entries | ForEach-Object { $_.FullName })
+            $expectedNames = @($allow + @("README-CANDIDATE.txt","SHA256SUMS.txt"))
+            if ($archiveNames.Count -ne $expectedNames.Count) {
+              throw "Unexpected ZIP file count: $($archiveNames.Count)"
+            }
+            foreach ($name in $archiveNames) {
+              if ($name -notin $expectedNames) { throw "Unexpected non-Windows file in ZIP: $name" }
+            }
+          }
+          finally { $zip.Dispose() }
+          (Get-FileHash $zipName -Algorithm SHA256).Hash.ToLowerInvariant() + "  " + $zipName |
+            Set-Content -Path "$zipName.sha256" -Encoding ascii
+          Write-Host "Windows-only unsigned candidate created (no Linux sources, .so, AppImage or scripts)"
+          Get-Content "$zipName.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feelcoin-core-v17-win64-unsigned-candidate
+          path: |
+            feelcoin-core-v17-win64-UNSIGNED-CANDIDATE.zip
+            feelcoin-core-v17-win64-UNSIGNED-CANDIDATE.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
