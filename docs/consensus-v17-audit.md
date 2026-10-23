@@ -1,6 +1,6 @@
 # Feelcoin v17 consensus upgrade — audit and implementation gate
 
-Status: **design/audit only**. No consensus activation has been scheduled. Do not merge or deploy without deterministic tests and independent review.
+Status: **candidate implementation and unit tests committed on a draft PR; not activated**. No consensus activation has been scheduled. Do not merge or deploy without full builds, consensus replay, deterministic integration tests and independent review.
 
 ## Invariants
 
@@ -19,6 +19,27 @@ Status: **design/audit only**. No consensus activation has been scheduled. Do no
   - `recalculate_difficulties`: recalculation across historical heights.
   - Coinbase verification checks the Feelcoin treasury output.
 - `src/hardforks/hardforks.cpp`: mainnet/testnet/stagenet currently list versions up to 16, from block 1.
+
+
+## Candidate branch implementation (2026-10-23)
+
+- `src/cryptonote_basic/feelcoin_lwma.h`: integer-only 90-block LWMA candidate, chronological timestamps, 6× target solvetime cap, monotonic virtual timestamps, minimum weighted-solvetime floor, 256-bit intermediates and 128-bit result checks.
+- `src/cryptonote_core/blockchain.cpp`: same version-based dispatch (v16 legacy vs future v17 LWMA) used on main-chain mining, alternate-chain validation, and historical difficulty recalculation.
+- `tests/unit_tests/difficulty.cpp`: candidate C++ tests for normal/fast/slow solvetimes, 60/90 windows, newest-history selection, invalid inputs and wide arithmetic.
+- `tests/difficulty/feelcoin_lwma_simulation.py`: reproducible synthetic 100-seed comparison. Results are illustrative, **not network measurements**.
+
+Illustrative synthetic average solve time in first 25 blocks after an abrupt network hashrate change:
+
+| New / old hashrate | N=60 | N=90 |
+|---|---:|---:|
+| 0.1× | 653 s | 749 s |
+| 0.5× | 200 s | 211 s |
+| 2× | 76 s | 71 s |
+| 10× | 20 s | 17 s |
+
+N=60 generally reacts faster to hashrate crashes. N=90 is a more conservative candidate and **not final**. This experiment alone cannot establish resistance to timestamp manipulation, real network churn, or chain reorganizations.
+
+**Critical open risks:** Current source has `CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT=7200` seconds and `BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW=60`. Validate timestamp security together with LWMA; do not activate a v17 algorithm while these conditions are unreviewed. The chain-level v16 replay and full production build have not passed yet. The 2% treasury coinbase validation and emission code have not been modified.
 
 ## Implementation specification — still to be validated
 
