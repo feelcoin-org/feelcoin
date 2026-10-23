@@ -41,12 +41,21 @@ jobs:
             mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake
             mingw-w64-x86_64-boost mingw-w64-x86_64-openssl
             mingw-w64-x86_64-zeromq mingw-w64-x86_64-libsodium
-            mingw-w64-x86_64-hidapi mingw-w64-x86_64-protobuf-c
-            mingw-w64-x86_64-libusb mingw-w64-x86_64-unbound git
+            mingw-w64-x86_64-protobuf-c mingw-w64-x86_64-unbound git
 
-      - name: Compile Windows Core executables
+      # HIDAPI/LibUSB package identifiers are no longer present on the
+      # GitHub runner's MSYS2 mirror. For the unsigned core-only QA build,
+      # disable hardware-wallet drivers explicitly rather than accepting
+      # a half-configured Trezor build. No consensus source code is changed.
+      - name: Compile Windows Core executables (no hardware-wallet drivers)
         run: |
-          make release-static-win64 -j2
+          cmake -S . -B build/release -G "MSYS Makefiles" \
+            -D STATIC=ON -D ARCH=x86-64 -D BUILD_64=ON \
+            -D CMAKE_BUILD_TYPE=Release -D BUILD_TAG=win-x64 \
+            -D CMAKE_TOOLCHAIN_FILE="$PWD/cmake/64-bit-toolchain.cmake" \
+            -D MSYS2_FOLDER="$(cd "$MINGW_PREFIX/.." && pwd -W)" \
+            -D USE_DEVICE_TREZOR=OFF -D USE_DEVICE_TREZOR_LIBUSB=OFF
+          cmake --build build/release --parallel 2
 
       - name: Stage ONLY native Windows binaries and generate SHA-256
         shell: pwsh
@@ -74,6 +83,7 @@ jobs:
           FEELCOIN CORE v17 — WINDOWS x64 UNSIGNED CANDIDATE
           =================================================
           FOR SECURITY / ANTIVIRUS EVALUATION ONLY.
+          Hardware-wallet/Trezor support is disabled in this QA candidate.
           NOT A FINAL MAINNET UPGRADE; v17 activation is NOT scheduled.
           Do not replace a production node or import real wallet keys here.
           This package includes ONLY .exe binaries plus this text and checksums.
