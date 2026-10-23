@@ -15,10 +15,10 @@ No v17 activation entry has been inserted into `src/hardforks/hardforks.cpp`. No
 
 ## Desired communication timeline (conditional)
 
-- October 23: publish a **tested and signed** v17 *release candidate*, if and only if all consensus-critical checks and builds pass. Announce proposed height, requirements, compatible miners/pools, and upgrade instructions. Otherwise communicate a progress update, not a release.
+- October 23: aim to publish a **tested, signed, activation-height-configured final v17 upgrade** only if all consensus-critical checks, testnet validation, builds, and network coordination have passed. Announce the exact height, requirements, compatible miners/pools, and upgrade instructions. Otherwise communicate a progress update, not a mandatory release.
 - Before the fork: independent pools and node operators validate upgrade, check node peers and chain tips, and explicitly acknowledge readiness. Complete testnet runs/reorg tests and ensure a viable network path.
-- After readiness is confirmed: commit the same activation height into mainnet's consensus schedule, produce and verify final release artifacts, and publish an unambiguous official upgrade notice. Never allow release software with an accidentally unreviewed activation.
-- October 30: height 20,500 becomes effective **only if** a fully tested fork release is shipped with consensus activation at that exact height and operators have had adequate notice. Otherwise choose a **later** height and update communications.
+- Before the **final** release: commit the confirmed activation height into mainnet consensus schedule, review the resulting binary and test its exact activation boundary, produce/verify release artifacts, and publish an unambiguous official upgrade notice. Never distribute software with an unreviewed activation.
+- October 30: height 20,500 becomes effective **only if** the final, fully tested v17 release has been shipped with the exact scheduled activation and operators have had approximately seven days' notice. **If the final release is not ready on October 23, select and announce a later activation height rather than compressing the community's upgrade window.**
 
 ## Mandatory release gates
 
