@@ -64,17 +64,27 @@ def mutate_header(blob, field, value):
 
 
 def guarded_submit(port, blob, expected_tip, description, marker=None, logpath=None):
+    # Only a real RPC-level block rejection qualifies. Network/timeouts are
+    # harness failures, never evidence of correctly enforced consensus.
     try:
         lab.rpc(port, "submit_block", [blob], timeout=45)
-    except Exception:
-        pass
+    except RuntimeError as exc:
+        expect(str(exc).startswith(f"RPC submit_block at {port}: "),
+               description + f": unexpected runtime error: {exc}")
     else:
         raise RuntimeError(description + " was incorrectly ACCEPTED!")
     expect(lab.current_tip(port) == expected_tip,
            description + " changed the canonical chain")
     if marker:
-        expect(logpath and marker in logpath.read_text(errors="replace"),
-               description + ": rejection reason not found in daemon log")
+        # Diagnostic logger may flush just after the JSON-RPC response.
+        found = False
+        for _ in range(20):
+            if logpath and marker in logpath.read_text(errors="replace"):
+                found = True
+                break
+            time.sleep(0.1)
+        expect(found,
+               description + ": specific consensus rejection reason not in diagnostic log")
     print(f"PASS: {description} rejected; chain unchanged", flush=True)
 
 
@@ -136,11 +146,16 @@ def main():
     port_a, port_b = lab.TEST_PORTS[0][1], lab.TEST_PORTS[1][1]
     try:
         lab.say("Review v16/v17 historical boundary from synthetic chain")
-        ha = lab.start_node(daemon, root, "node_a", lab.TEST_PORTS[0], fixed=True)
+        ha = lab.start_node(
+            daemon, root, "node_a", lab.TEST_PORTS[0], fixed=True,
+            log_level="*:WARNING,verify:DEBUG,cn:INFO,logging:INFO")
         expect(ha >= 122, f"Expected synthetic chain of at least 122 blocks, got {ha}")
         initial_tip = lab.current_tip(port_a)
         historical = check_historical_versions(port_a, initial_tip[0])
         logpath = root / "node_a.log"
+        categories = logpath.read_text(errors="replace")
+        expect("verify:DEBUG" in categories,
+               "Diagnostic verify logging is not enabled; cannot prove rejection reason")
 
         lab.say("Adversarial main-chain block/header validation")
         t = lab.rpc(port_a, "get_block_template",
@@ -165,7 +180,9 @@ def main():
         print("PASS: v17 negative block tests completed", flush=True)
 
         lab.say("Adversarial alternative-chain timestamp validation")
-        hb = lab.start_node(daemon, root, "node_b", lab.TEST_PORTS[1], fixed=True)
+        hb = lab.start_node(
+            daemon, root, "node_b", lab.TEST_PORTS[1], fixed=True,
+            log_level="*:WARNING,verify:DEBUG,cn:INFO,logging:INFO")
         expect(hb == ha, "Fakechain seeds differ in height")
         expect(lab.current_tip(port_b) == lab.current_tip(port_a),
                "Fakechain seeds differ in hash")
