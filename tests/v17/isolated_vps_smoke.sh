@@ -52,14 +52,29 @@ fi
 
 say "Build an isolated daemon and unit tests"
 git -C "$SOURCE" submodule update --init --recursive
-LAB="$(mktemp -d /tmp/feelcoin-v17-regtest.XXXXXXXX)"
+if [[ -n "${V17_REUSE_LAB:-}" ]]; then
+  LAB="$V17_REUSE_LAB"
+  [[ "$LAB" == /tmp/feelcoin-v17-regtest.* && -d "$LAB/build" &&
+     ! -L "$LAB" && ! -L "$LAB/build" &&
+     -f "$LAB/build/CMakeCache.txt" ]] ||
+    fail "Invalid existing lab build directory."
+  [[ "$(stat -c '%u' "$LAB")" == "$(id -u)" ]] ||
+    fail "Existing lab is not owned by the test user."
+  grep -Fqx "CMAKE_HOME_DIRECTORY:INTERNAL=$SOURCE" "$LAB/build/CMakeCache.txt" ||
+    fail "Existing CMake build belongs to a different source checkout."
+else
+  LAB="$(mktemp -d /tmp/feelcoin-v17-regtest.XXXXXXXX)"
+fi
 echo "Lab directory: $LAB"
 cmake -S "$SOURCE" -B "$LAB/build" \
   -D ARCH=default -D CMAKE_BUILD_TYPE=Release -D BUILD_TESTS=ON
 cmake --build "$LAB/build" --target daemon unit_tests -j2
 DAEMON="$LAB/build/bin/feelcoind"
-TESTER="$LAB/build/bin/unit_tests"
-[[ -x "$DAEMON" && -x "$TESTER" ]] || fail "Build outputs missing."
+# monero_add_minimal_executable does not set a top-level bin output directory;
+# unit_tests is emitted in the tests/unit_tests build subdirectory.
+TESTER="$LAB/build/tests/unit_tests/unit_tests"
+[[ -x "$DAEMON" ]] || fail "Daemon build output missing: $DAEMON"
+[[ -x "$TESTER" ]] || fail "Unit test build output missing: $TESTER"
 
 say "Run v17 difficulty and timestamp unit tests"
 "$TESTER" --gtest_filter='difficulty.feelcoin_lwma_*:feelcoin_timestamp.*' --gtest_color=no
