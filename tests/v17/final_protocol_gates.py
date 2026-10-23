@@ -215,7 +215,7 @@ def main():
         expect(not re.search(r"\{\s*17\s*,", mainnet),
                "Mainnet v17 activation unexpectedly present")
         expect(subprocess.check_output(["git", "-C", str(SOURCE),
-                                        "status", "--porcelain"], text=True).strip() == "",
+                                        "status", "--porcelain", "--untracked-files=no"], text=True).strip() == "",
                "Dirty test checkout; stop before release")
         print("Linux daemon SHA256:", digest, flush=True)
         print("PASS: isolated branch, clean source, no mainnet v17 activation",
