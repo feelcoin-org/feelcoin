@@ -39,7 +39,26 @@ Illustrative synthetic average solve time in first 25 blocks after an abrupt net
 
 N=60 generally reacts faster to hashrate crashes. N=90 is a more conservative candidate and **not final**. This experiment alone cannot establish resistance to timestamp manipulation, real network churn, or chain reorganizations.
 
-**Emission accounting audit finding:** `get_block_reward` in `src/cryptonote_basic/cryptonote_basic_impl.cpp` currently subtracts the 64-bit `already_generated_coins` from the 64-bit `MONEY_SUPPLY` without a saturation check. The tail subsidy is separately enforced, but when generated coins exceed `MONEY_SUPPLY`, unsigned subtraction could wrap and distort rewards; ultimately 64-bit cumulative atomic supply also has a ceiling. This is a future consensus/economic correctness risk, not evidence of a current chain incident. A safe 128-bit accounting migration (including persistent DB/RPC formats) and exact old-chain replay require a separate reviewed change; leave existing emission and 2% treasury behavior unchanged until proven safe.\n\n**Critical open risks:** Current source has `CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT=7200` seconds and `BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW=60`. Validate timestamp security together with LWMA; do not activate a v17 algorithm while these conditions are unreviewed. The chain-level v16 replay and full production build have not passed yet. The 2% treasury coinbase validation and emission code have not been modified.
+## Supply accounting — verified correction
+
+The earlier concern about an inevitable unsigned-subtraction overflow was a **false positive**. Both the main-chain block acceptance path (`handle_block_to_main_chain`) and the alternative-chain metadata path in `src/cryptonote_core/blockchain.cpp` already saturate `already_generated_coins` at `MONEY_SUPPLY`. The `get_block_reward` subtraction is therefore safe for properly validated chains, including after tail emission starts. This saturation is intentional in the source comment and must be preserved.
+
+**Remaining distinction:** the 64-bit `already_generated_coins` field is a capped *emission-curve input*, **not** a count of all coins ever minted after saturation. Tail block subsidies continue after the capped value reaches `MONEY_SUPPLY`; this is the intended unlimited tail-emission behavior. Don't replace the capped value with an uncapped 128-bit value inside `get_block_reward` or change the on-chain treasury distribution.
+
+**Solution for accurate total-issued supply:** add a **separate 128-bit off-chain accounting/indexer** summing validated coinbase **base rewards**, excluding transaction fees, over all main-chain blocks. It must rollback orphaned blocks on reorgs and publish decimal strings in RPC/API to avoid JSON integer precision limits. Backfill and independently reconcile with sampled blocks. This does **not** require a consensus hard fork. A more invasive on-chain 128-bit storage migration should be considered only if a demonstrated consensus requirement demands it.
+
+## Timestamp hardening — proposal requiring testing
+
+Current main-chain `check_block_timestamp(const block&)` enforces a future bound relative to node wall-clock time of 7200 seconds plus a median of the last 60 timestamps. The alternative-chain `check_block_timestamp(vector&, const block&)` enforces the median but **does not directly enforce the same wall-clock future bound** at that entry point; assess subsequent reorg validation before drawing exploit conclusions.
+
+Proposed v17-only changes for testing, **not committed or approved**:
+
+1. Test reducing the permissible future offset from two hours to **30 minutes**, with a measured clock-skew margin and upgrade coordination; reject if legitimate miners/nodes are affected. Do not retroactively impose the new bound on historical v16 blocks.
+2. Use a single height/version-aware future-time helper for main-chain and alternative-chain processing, with a carefully reviewed reorg/validation flow. Include checks for clock-boundary revalidation behavior.
+3. Retain median-time-past checks and LWMA's per-solvetime clamp. These protect against different classes of timestamp manipulation, and neither substitutes for the other.
+4. Test old/new version boundary, a chain reorganizing across the boundary, far-future timestamps, 30-minute boundaries, time drift, and adversarial consecutive timestamps.
+
+**Open gates:** Full production builds, historical v16 replay, timestamp/adversarial testnet simulations, and consensus peer review have not passed. Treasury validation and emission amounts remain unchanged.
 
 ## Implementation specification — still to be validated
 
@@ -49,7 +68,7 @@ N=60 generally reacts faster to hashrate crashes. N=90 is a more conservative ca
 4. Add a **version/height-aware** dispatch retaining the legacy algorithm for all historical heights and selecting LWMA only at the configured activation height.
 5. Ensure main chain, alternate chain, recalc, and difficulty history/verification use matching inputs and activation rules. Any adjusted window selection must be identical across paths.
 6. Test v16 replay equivalence, activation boundary, fork/reorg at activation, adversarial timestamps, rapid hashrate changes, stable hashrate, zero/maximum values and 128-bit boundaries. Build both Linux and Windows and synchronize a private test network.
-7. Separately audit timestamp rules and supply accounting. These are **not approved changes** just by appearing in this plan; each needs its own deterministic safety case.
+7. Audit timestamp rules with main/alternative-chain parity; accurate uncapped supply reporting can be implemented off-chain, separate from consensus. Neither constitutes an approved consensus change.
 8. Only after successful reviews and testnet adoption, coordinate node/pool/wallet releases, set a sufficiently future activation height and announce it publicly.
 
 ## Explicitly out of scope
