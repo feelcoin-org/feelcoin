@@ -203,9 +203,11 @@ def run():
 
 
 if __name__ == "__main__":
+    failed = False
     try:
         run()
     except Exception as exc:
+        failed = True
         print(f"STAGE 6 ERROR: {exc}", file=sys.stderr, flush=True)
     finally:
         if proc is not None and proc.poll() is None:
@@ -216,3 +218,5 @@ if __name__ == "__main__":
                 proc.kill()
                 proc.wait(timeout=5)
         print("Stage 6 daemon closed; production remains unchanged.", flush=True)
+    if failed:
+        sys.exit(1)
