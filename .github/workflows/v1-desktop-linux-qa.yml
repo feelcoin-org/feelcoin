@@ -68,9 +68,9 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 95); do
-            id="$(gh api repos/feelcoin-org/feelcoin/actions/runs/40089030102/artifacts --jq '.artifacts[] | select(.name == "feelcoin-core-v1.0.0-linux-x64-candidate" and .expired == false) | .id' | head -1)"
+            id="$(gh api repos/feelcoin-org/feelcoin/actions/runs/40090632177/artifacts --jq '.artifacts[] | select(.name == "feelcoin-core-v1.0.0-linux-x64-candidate" and .expired == false) | .id' | head -1)"
             if [ -n "$id" ]; then echo "Verified Linux Core artifact ID $id"; exit 0; fi
-            status="$(gh api repos/feelcoin-org/feelcoin/actions/runs/40089030102 --jq '.status')"
+            status="$(gh api repos/feelcoin-org/feelcoin/actions/runs/40090632177 --jq '.status')"
             if [ "$status" = completed ]; then echo 'ERROR: Core build completed without Linux artifact'; exit 1; fi
             echo "Core still compiling ($attempt/95): no artifact yet"
             sleep 60
@@ -80,7 +80,7 @@ jobs:
         with:
           name: feelcoin-core-v1.0.0-linux-x64-candidate
           repository: feelcoin-org/feelcoin
-          run-id: 40089030102
+          run-id: 40090632177
           github-token: ${{ github.token }}
           path: core-candidate
       - name: Verify Linux Core checksum and bundle only Linux-native services
