@@ -46,9 +46,16 @@ jobs:
         timeout-minutes: 8
         run: |
           set -euo pipefail
-          test -x build/release/bin/unit_tests
+          test -d build/release
+          unit_test_bin="$(find build/release -type f -name unit_tests -perm /111 -print -quit)"
+          if [ -z "$unit_test_bin" ]; then
+            echo 'ERROR: Compiled unit_tests executable not found'
+            find build/release -name unit_tests -print
+            exit 1
+          fi
+          echo "Running difficulty tests from $unit_test_bin"
           timeout --signal=TERM --kill-after=10s 420s \
-            build/release/bin/unit_tests --gtest_filter='difficulty.*'
+            "$unit_test_bin" --gtest_filter='difficulty.*'
       - name: Stage isolated Linux Core QA package and verify runtime
         run: |
           set -euo pipefail
