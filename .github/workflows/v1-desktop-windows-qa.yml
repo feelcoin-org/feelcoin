@@ -132,8 +132,8 @@ jobs:
           }
           $cargoPath = 'desktop-source/src-tauri/Cargo.toml'
           $cargo = Get-Content $cargoPath -Raw
-          if ($cargo -notmatch '(?m)^version = "0\.3\.0"$') { throw "Expected pinned Desktop Cargo version missing" }
-          $cargo = $cargo -replace '(?m)^version = "0\.3\.0"$','version = "1.0.0"'
+          if ($cargo -notmatch '(?m)^version\s*=\s*"0\.3\.0"\r?$') { throw "Expected pinned Desktop Cargo version missing" }
+          $cargo = $cargo -replace '(?m)^version\s*=\s*"0\.3\.0"\r?$','version = "1.0.0"'
           Set-Content $cargoPath $cargo -Encoding utf8
           # Static gate: Windows bundle must not reference Unix paths or source directories.
           $cfg = Get-Content 'desktop-source/src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
