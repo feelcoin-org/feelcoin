@@ -1,6 +1,6 @@
 # Feelcoin v17 — seven-day minimum mainnet upgrade notice (October 24, 2026 proposal)
 
-**STATUS: PROPOSED FOR DISCUSSION ONLY. NO MAINNET ACTIVATION IS CODED, ANNOUNCED, OR AUTHORIZED HERE.** The old October 30 / height 18,400 estimate is superseded.
+**STATUS: NO HEIGHT OR DATE SELECTED. The developer has explicitly rejected treating 23,000 as a chosen target. NO MAINNET ACTIVATION IS CODED, ANNOUNCED, OR AUTHORIZED HERE.** The old October 30 / height 18,400 estimate is superseded.
 
 ## Verified inputs (UTC)
 
@@ -14,7 +14,7 @@
 
 - Requested minimum lead time: **7 full days from the public availability of approved binaries and operator announcement**. Earliest hypothetical start today at **2026-10-24 ~08:49 Africa/Algiers** gives earliest calendar date **2026-10-31 ~08:49 Africa/Algiers**, *but this is not yet a confirmed activation date*.
 - At 120s/block the expected seven-day growth is **5,040 blocks**; from observed tip ~16,126, an exact-pace height is **~21,166**. Therefore a **21,200** fork is too close to guarantee that operators truly have seven days after release; a faster network would reach it early.
-- **Conservative candidate block height: 23,000** for further testing and operator planning only. At snapshot height 16,126 it leaves **6,874 blocks**.
+- **Illustrative scenario only: block height 23,000 is NOT agreed or selected**, and MUST NOT be called the activation target. Actual height remains **TBD** pending explicit project approval and release readiness. At snapshot height 16,126 it leaves **6,874 blocks**.
 - Estimated arrival of height 23,000 from 2026-10-24 08:49 Africa/Algiers:
   - At 120s/block: **2026-11-02 around 21:57 Algeria time**, about 9.55 days.
   - At 90s/block: **2026-10-31 around 12:40 Algeria time**, about 7.16 days.
