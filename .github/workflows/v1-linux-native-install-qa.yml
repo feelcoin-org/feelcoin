@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/v1-linux-native-install-qa.yml'
       - 'scripts/release/linux_deb_deps.py'
+      - 'scripts/release/wallet_offline_qa.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -61,6 +62,10 @@ jobs:
             ldd "core-build/bin/$exe" | tee "/tmp/$exe-ldd"
             if grep -Eq 'not found|version .* not found' "/tmp/$exe-ldd"; then exit 1; fi
           done
+      - name: Offline mnemonic restore and matching-address QA (disposable wallets)
+        run: |
+          set -euo pipefail
+          python3 scripts/release/wallet_offline_qa.py core-build/bin
       - name: Fetch exact last published full Desktop GUI
         run: |
           set -euo pipefail
