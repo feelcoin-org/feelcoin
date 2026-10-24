@@ -1,0 +1,180 @@
+name: Feelcoin Desktop GUI v1.0.0 Linux QA packages
+on:
+  push:
+    branches: [feature/v17-consensus-audit]
+    paths: ['.github/workflows/v1-desktop-linux-qa.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  linux-desktop:
+    name: Build Linux v1.0.0 GUI DEB / AppImage - native ELF only
+    runs-on: ubuntu-22.04
+    timeout-minutes: 210
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout exact published full Desktop v0.3.0 GUI source
+        run: |
+          set -euo pipefail
+          git init desktop-source
+          git -C desktop-source fetch --depth 1 https://github.com/feelcoin-org/feelcoin-desktop.git b89c7630a4fd530217716e060cd47a9631f8a8d6
+          git -C desktop-source checkout --detach FETCH_HEAD
+          test "$(git -C desktop-source rev-parse HEAD)" = b89c7630a4fd530217716e060cd47a9631f8a8d6
+          grep -Fq 'fn start_local_services' desktop-source/src-tauri/src/lib.rs
+      - name: Install Linux GUI packaging and runtime dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            patchelf libssl-dev libunbound-dev libunwind-dev libzmq3-dev \
+            libsodium-dev libprotobuf-dev libreadline-dev libhidapi-dev \
+            libusb-1.0-0-dev libicu-dev libboost-all-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop-source/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Set Desktop version v1.0.0 and validate frontend
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re,pathlib
+          root=pathlib.Path('desktop-source')
+          for name in ('package.json','package-lock.json','src-tauri/tauri.conf.json'):
+              p=root/name
+              d=json.loads(p.read_text())
+              if name!='package-lock.json':
+                  assert d['version']=='0.3.0', name
+              d['version']='1.0.0'
+              if name=='package-lock.json' and '' in d.get('packages',{}):
+                  d['packages']['']['version']='1.0.0'
+              p.write_text(json.dumps(d,indent=2)+'\n')
+          p=root/'src-tauri/Cargo.toml'
+          s,n=re.subn(r'(?m)^version[ \t]*=[ \t]*"0\.3\.0"[ \t]*$','version = "1.0.0"',p.read_text(),count=1)
+          assert n==1, 'Cargo version mismatch'
+          p.write_text(s)
+          PY
+          cd desktop-source
+          npm ci
+          npm run build
+      - name: Check readiness of fixed Linux Core v1.0 artifact without rebuilding it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 95); do
+            id="$(gh api repos/feelcoin-org/feelcoin/actions/runs/40090632177/artifacts --jq '.artifacts[] | select(.name == "feelcoin-core-v1.0.0-linux-x64-candidate" and .expired == false) | .id' | head -1)"
+            if [ -n "$id" ]; then echo "Verified Linux Core artifact ID $id"; exit 0; fi
+            status="$(gh api repos/feelcoin-org/feelcoin/actions/runs/40090632177 --jq '.status')"
+            if [ "$status" = completed ]; then echo 'ERROR: Core build completed without Linux artifact'; exit 1; fi
+            echo "Core still compiling ($attempt/95): no artifact yet"
+            sleep 60
+          done
+          echo "ERROR: Core artifact not ready"; exit 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: feelcoin-core-v1.0.0-linux-x64-candidate
+          repository: feelcoin-org/feelcoin
+          run-id: 40090632177
+          github-token: ${{ github.token }}
+          path: core-candidate
+      - name: Verify Linux Core checksum and bundle only Linux-native services
+        run: |
+          set -euo pipefail
+          (cd core-candidate && sha256sum -c feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz.sha256)
+          mkdir linux-core-extract
+          tar xzf core-candidate/feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz -C linux-core-extract
+          (cd linux-core-extract && sha256sum -c SHA256SUMS.txt)
+          grep -Fq '{ 17, 21205, 0,' src/hardforks/hardforks.cpp
+          grep -Fq 'DEF_FEELCOIN_VERSION "1.0.0"' src/version.cpp.in
+          target=desktop-source/src-tauri/resources/bin
+          lib=desktop-source/src-tauri/resources/lib
+          mkdir -p "$target" "$lib"
+          find "$target" -maxdepth 1 -type f -delete
+          # CRITICAL: the old GUI repo tracked libcom_err.so.2 linked against GLIBC_2.38,
+          # incompatible with the Ubuntu 22.04 runtime. Use the native OS library instead.
+          find "$lib" -maxdepth 1 -type f -delete
+          test ! -e "$lib/libcom_err.so.2"
+          test -n "$(ldconfig -p | grep 'libcom_err.so.2' || true)"
+          for exe in feelcoind feelcoin-wallet-rpc; do
+            cp "linux-core-extract/$exe" "$target/$exe"
+            chmod +x "$target/$exe"
+            test "$(od -An -tx1 -N4 "$target/$exe" | tr -d ' \n')" = 7f454c46
+            "$target/$exe" --version | tee "/tmp/$exe-version"
+            grep -Fq 'v1.0.0-6b1a1f08f' "/tmp/$exe-version"
+            # Do not override the system loader paths with legacy packaged libraries.
+            ldd "$target/$exe" | tee "/tmp/$exe-ldd"
+            if grep -Eq 'not found|version .+ not found' "/tmp/$exe-ldd"; then
+              echo "ERROR: Linux runtime dependency incompatible for $exe"
+              exit 1
+            fi
+          done
+          python3 - <<'PY'
+          import pathlib,json
+          root=pathlib.Path('desktop-source/src-tauri')
+          f=root/'tauri.conf.json'
+          cfg=json.loads(f.read_text())
+          cfg['bundle']['resources']=['resources/bin/feelcoind','resources/bin/feelcoin-wallet-rpc']
+          # Never ship GLIBC-incompatible legacy .so from v0.3.0 Desktop.
+          assert not (root/'resources/lib/libcom_err.so.2').exists()
+          f.write_text(json.dumps(cfg,indent=2)+'\n')
+          assert all('.exe' not in s and '.dll' not in s for s in cfg['bundle']['resources'])
+          print('Linux resources:',cfg['bundle']['resources'])
+          PY
+      - name: Check Rust GUI backend and prepare icons
+        working-directory: desktop-source
+        run: |
+          set -euo pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml
+          npx tauri icon public/feelcoin-logo.png --fit contain
+      - name: Build Desktop v1.0.0 DEB and AppImage (QA only)
+        working-directory: desktop-source
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          set -euo pipefail
+          npx tauri build --bundles deb,appimage
+      - name: Inspect actual Linux package contents, reject Windows files, generate checksums
+        run: |
+          set -euo pipefail
+          mkdir desktop-linux-qa
+          deb="$(find desktop-source/src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          app="$(find desktop-source/src-tauri/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$deb" && test -n "$app"
+          cp "$deb" "$app" desktop-linux-qa/
+          dpkg-deb --contents "$deb" > desktop-linux-qa/DEB-CONTENTS.txt
+          grep -Fq 'feelcoind' desktop-linux-qa/DEB-CONTENTS.txt
+          grep -Fq 'feelcoin-wallet-rpc' desktop-linux-qa/DEB-CONTENTS.txt
+          if grep -Ei '\.(exe|dll|bat|ps1)([[:space:]]|$)' desktop-linux-qa/DEB-CONTENTS.txt; then echo 'Windows files in DEB'; exit 1; fi
+          absapp="$(realpath "$app")"
+          chmod +x "$absapp"
+          mkdir appimage-audit
+          (cd appimage-audit && "$absapp" --appimage-extract >/dev/null)
+          test -d appimage-audit/squashfs-root
+          test -n "$(find appimage-audit/squashfs-root -type f -name feelcoind -print -quit)"
+          test -n "$(find appimage-audit/squashfs-root -type f -name feelcoin-wallet-rpc -print -quit)"
+          if find appimage-audit/squashfs-root -type f \( -iname '*.exe' -o -iname '*.dll' -o -iname '*.bat' \) | grep -q .; then echo 'Windows files in AppImage'; exit 1; fi
+          (
+            cd desktop-linux-qa
+            sha256sum *.deb *.AppImage > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+          printf '%s\n' \
+            'Feelcoin Desktop v1.0.0 Linux QA — NOT public release' \
+            'GUI commit: b89c7630a4fd530217716e060cd47a9631f8a8d6' \
+            'Core commit: 6b1a1f08f82fb1ce33343ee512f852872553f824' \
+            'Fork height 21205 pending consensus approval and operator notice.' \
+            'Keep existing wallet and blockchain files safe; test with disposable wallets.' \
+            > desktop-linux-qa/README-QA.txt
+          echo 'PASS: native Linux DEB/AppImage audited'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feelcoin-desktop-v1.0.0-linux-x64-QA
+          path: desktop-linux-qa/*
+          if-no-files-found: error
+          retention-days: 14

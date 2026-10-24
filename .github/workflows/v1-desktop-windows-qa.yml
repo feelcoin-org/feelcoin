@@ -1,0 +1,214 @@
+name: Feelcoin Desktop GUI v1.0.0 Windows QA installer
+# Packages the published v0.3.0 FULL wallet UI with pinned verified Windows Core v1.0 binaries.
+# Candidate only; does NOT publish a release, deploy nodes, or activate a fork.
+on:
+  push:
+    branches: [feature/v17-consensus-audit]
+    paths: ['.github/workflows/v1-desktop-windows-qa.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  windows-desktop:
+    name: Build Windows GUI v1.0.0 (Windows files ONLY)
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout Core repository for build provenance
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fetch pinned v0.3.0 full Desktop wallet GUI sources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          git init desktop-source
+          git -C desktop-source fetch --depth 1 https://github.com/feelcoin-org/feelcoin-desktop.git b89c7630a4fd530217716e060cd47a9631f8a8d6
+          if ($LASTEXITCODE -ne 0) { throw "Unable to fetch vetted v0.3.0 GUI source" }
+          git -C desktop-source checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Cannot checkout pinned GUI source" }
+          $actual = (git -C desktop-source rev-parse HEAD).Trim()
+          if ($actual -ne 'b89c7630a4fd530217716e060cd47a9631f8a8d6') {
+            throw "Unexpected Desktop GUI source revision: $actual"
+          }
+          $source = Get-Content 'desktop-source/src-tauri/src/lib.rs' -Raw
+          if ($source -notmatch 'fn start_local_services' -or $source -notmatch 'fn resolve_bundled_binary') {
+            throw "Fetched Desktop source is missing the complete wallet backend"
+          }
+
+      - name: Download pinned Windows Core v1.0.0 candidate from same Core repo
+        uses: actions/download-artifact@v4
+        with:
+          name: feelcoin-core-v1.0.0-win64-candidate
+          repository: feelcoin-org/feelcoin
+          run-id: 40077970267
+          github-token: ${{ github.token }}
+          path: core-candidate
+
+      - name: Validate checksum and stage ONLY Windows-native daemon / wallet RPC / DLLs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = "core-candidate/feelcoin-core-v1.0.0-win64-UNSIGNED-CANDIDATE.zip"
+          $shaFile = "$zip.sha256"
+          if (!(Test-Path $zip) -or !(Test-Path $shaFile)) {
+            throw "Pinned Core artifact is not available: refusing to recompile silently"
+          }
+          $expectedZip = ((Get-Content $shaFile -First 1).Trim() -split '\s+')[0]
+          $actualZip = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($expectedZip -ne $actualZip) { throw "Core artifact checksum mismatch" }
+          Expand-Archive $zip -DestinationPath core-extracted
+
+          $inputFiles = @(Get-ChildItem core-extracted -File)
+          $checksums = Get-Content "core-extracted/SHA256SUMS.txt"
+          foreach ($line in $checksums) {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s+([a-zA-Z0-9_.+-]+)$') {
+              throw "Invalid core checksum line: $line"
+            }
+            $expectedHash = $Matches[1]
+            $filename = $Matches[2]
+            $fullpath = Join-Path core-extracted $filename
+            if (!(Test-Path $fullpath)) { throw "Core checksum file missing: $filename" }
+            $actualHash = (Get-FileHash $fullpath -Algorithm SHA256).Hash
+            if ($actualHash -ne $expectedHash) { throw "Core SHA256 mismatch: $filename" }
+          }
+          foreach ($f in $inputFiles) {
+            if ($f.Name -notmatch '^(feelcoind|feelcoin-wallet-cli|feelcoin-wallet-rpc)\.exe$|^[a-z0-9_.+-]+\.dll$|^(README-CANDIDATE|SHA256SUMS)\.txt$') {
+              throw "Unexpected file in source Core ZIP: $($f.Name)"
+            }
+          }
+          $dest = 'desktop-source/src-tauri/resources/bin'
+          if (!(Test-Path $dest)) { New-Item -ItemType Directory -Force $dest | Out-Null }
+          # Remove tracked Linux binaries and any older Windows artifacts, without touching real wallets.
+          Get-ChildItem $dest -File -ErrorAction SilentlyContinue | Remove-Item -Force
+          $lib = 'desktop-source/src-tauri/resources/lib'
+          if (Test-Path $lib) { Get-ChildItem $lib -File -ErrorAction SilentlyContinue | Remove-Item -Force }
+          foreach ($n in @("feelcoind.exe", "feelcoin-wallet-rpc.exe")) {
+            Copy-Item (Join-Path core-extracted $n) (Join-Path $dest $n) -ErrorAction Stop
+          }
+          $dlls = @(Get-ChildItem core-extracted -Filter '*.dll' -File)
+          if ($dlls.Count -lt 1) { throw "Missing native Windows runtime dependencies" }
+          foreach ($dll in $dlls) { Copy-Item $dll.FullName $dest }
+          # Confirm PE magic on every bundled native executable/library.
+          Get-ChildItem $dest -File | ForEach-Object {
+            $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+            if ($bytes.Length -lt 2 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) {
+              throw "Non-Windows PE binary rejected: $($_.Name)"
+            }
+          }
+          $env:PATH = "$(Resolve-Path $dest);$env:SystemRoot\System32;$env:SystemRoot"
+          foreach ($exe in @("feelcoind.exe", "feelcoin-wallet-rpc.exe")) {
+            & (Join-Path (Resolve-Path $dest) $exe) --version
+            if ($LASTEXITCODE -ne 0) { throw "Windows Desktop bundled binary failed: $exe" }
+          }
+          Write-Host "Verified native Windows Core backend and runtime DLLs from commit 6b1a1f08f"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop-source/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Set coherent Desktop v1.0.0 versions and exact native Windows resources
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($path in @('desktop-source/package.json', 'desktop-source/src-tauri/tauri.conf.json')) {
+            $json = Get-Content $path -Raw | ConvertFrom-Json
+            $json.version = '1.0.0'
+            if ($path -like '*tauri.conf.json') {
+              $dlls = @(Get-ChildItem 'desktop-source/src-tauri/resources/bin' -Filter '*.dll' -File | Sort-Object Name)
+              $nativeOnly = @('resources/bin/feelcoind.exe', 'resources/bin/feelcoin-wallet-rpc.exe') +
+                @($dlls | ForEach-Object { 'resources/bin/' + $_.Name })
+              $json.bundle.resources = $nativeOnly
+              Write-Host "Explicit native Windows bundle resources: $($nativeOnly -join ', ')"
+            }
+            $json | ConvertTo-Json -Depth 50 | Set-Content $path -Encoding utf8
+          }
+          $cargoPath = 'desktop-source/src-tauri/Cargo.toml'
+          $cargo = Get-Content $cargoPath -Raw
+          if ($cargo -notmatch '(?m)^version\s*=\s*"0\.3\.0"\r?$') { throw "Expected pinned Desktop Cargo version missing" }
+          $cargo = $cargo -replace '(?m)^version\s*=\s*"0\.3\.0"\r?$','version = "1.0.0"'
+          Set-Content $cargoPath $cargo -Encoding utf8
+          # Static gate: Windows bundle must not reference Unix paths or source directories.
+          $cfg = Get-Content 'desktop-source/src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
+          if (@($cfg.bundle.resources | Where-Object { $_ -notmatch '^resources/bin/(?:feelcoind\.exe|feelcoin-wallet-rpc\.exe|[a-z0-9_.+-]+\.dll)$' }).Count -gt 0) {
+            throw "Non-Windows resource in desktop installer config"
+          }
+
+      - name: Install and check complete Desktop wallet frontend
+        working-directory: desktop-source
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed' }
+
+      - name: Check Rust Desktop backend
+        working-directory: desktop-source/src-tauri
+        shell: pwsh
+        run: |
+          cargo check
+          if ($LASTEXITCODE -ne 0) { throw 'Backend validation failed' }
+
+      - name: Generate official Windows icons
+        working-directory: desktop-source
+        shell: pwsh
+        run: |
+          npx tauri icon public/feelcoin-logo.png --fit contain
+          if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed' }
+
+      - name: Build Desktop GUI v1.0.0 NSIS Windows installer
+        working-directory: desktop-source
+        shell: pwsh
+        run: |
+          npx tauri build --bundles nsis
+          if ($LASTEXITCODE -ne 0) { throw 'Windows GUI installer build failed' }
+
+      - name: Audit actual Windows installer (reject ALL Linux files/source)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          if (!(Test-Path $sevenZip)) { throw '7-Zip auditor missing' }
+          $installers = @(Get-ChildItem 'desktop-source/src-tauri/target/release/bundle/nsis' -Filter '*.exe' -File)
+          if ($installers.Count -ne 1) { throw "Expected 1 Windows installer, found $($installers.Count)" }
+          $content = & $sevenZip l -slt $installers[0].FullName | Out-String
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect NSIS installer' }
+          foreach ($needed in @('feelcoind.exe', 'feelcoin-wallet-rpc.exe')) {
+            if ($content -notmatch [regex]::Escape($needed)) { throw "Missing Windows Core backend from installer: $needed" }
+          }
+          foreach ($dll in @(Get-ChildItem 'desktop-source/src-tauri/resources/bin' -Filter '*.dll')) {
+            if ($content -notmatch [regex]::Escape($dll.Name)) { throw "Missing bundled native DLL: $($dll.Name)" }
+          }
+          # Check actual installer archive paths, not only build inputs.
+          if ($content -match '(?im)^Path\s*=\s*[^\r\n]*(?:\.so(?:\.\d+)?|\.AppImage|\.deb|\.sh|\.cpp|\.cc|\.rs|\.hpp|\.h|\.a|\.o|\.obj|[\\/]feelcoind|[\\/]feelcoin-wallet-rpc)\s*$') {
+            throw 'Linux binary, source file or Unix library found in Windows installer'
+          }
+          New-Item -ItemType Directory -Force 'desktop-windows-qa' | Out-Null
+          Copy-Item $installers[0].FullName 'desktop-windows-qa/'
+          $copy = Get-ChildItem 'desktop-windows-qa' -Filter '*.exe' | Select-Object -First 1
+          $hash = (Get-FileHash $copy.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($copy.Name)" | Set-Content 'desktop-windows-qa/SHA256SUMS.txt' -Encoding ascii
+          @(
+            'Feelcoin Desktop GUI v1.0.0 Windows QA candidate — NOT approved public release'
+            'Desktop GUI based on official released v0.3.0 source commit b89c7630a4fd530217716e060cd47a9631f8a8d6'
+            'Bundled Windows Core v1.0.0 commit 6b1a1f08f82fb1ce33343ee512f852872553f824'
+            'Protocol v17 target height 21205 (subject to final consensus approval and adequate operator notice)'
+            'No Linux binaries, .so, .deb, .AppImage, .sh, .cpp, .rs or source trees in installer.'
+            'Unsigned installer; keep Windows Defender enabled and use disposable wallets for initial tests.'
+          ) | Set-Content 'desktop-windows-qa/README-QA.txt' -Encoding utf8
+          Write-Host "PASS: Windows GUI v1.0 installer audited; sha256 $hash"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feelcoin-desktop-v1.0.0-windows-x64-QA
+          path: desktop-windows-qa/*
+          if-no-files-found: error
+          retention-days: 14

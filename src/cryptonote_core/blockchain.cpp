@@ -44,6 +44,8 @@
 #include "cryptonote_basic/events.h"
 #include "cryptonote_config.h"
 #include "feelcoin_treasury.h"
+#include "cryptonote_basic/feelcoin_lwma.h"
+#include "cryptonote_basic/feelcoin_timestamp_rules.h"
 #include "cryptonote_basic/miner.h"
 #include "hardforks/hardforks.h"
 #include "misc_language.h"
@@ -89,6 +91,19 @@ DISABLE_VS_WARNINGS(4267)
 
 // used to overestimate the block reward when estimating a per kB to use
 #define BLOCK_REWARD_OVERESTIMATE (10 * 1000000000000)
+
+// Both the main chain and any alternative/recalculated chain must select
+// exactly the same retarget algorithm at the same consensus block height.
+// There is currently no v17 activation height in the hardfork schedule.
+static cryptonote::difficulty_type feelcoin_difficulty_for_version(
+  const std::vector<uint64_t>& timestamps,
+  const std::vector<cryptonote::difficulty_type>& cumulative_difficulties,
+  size_t target_seconds, uint8_t version)
+{
+  if (version >= HF_VERSION_FEELCOIN_LWMA)
+    return cryptonote::next_difficulty_lwma(timestamps, cumulative_difficulties, target_seconds);
+  return cryptonote::next_difficulty(timestamps, cumulative_difficulties, target_seconds);
+}
 
 //------------------------------------------------------------------
 Blockchain::Blockchain(tx_memory_pool& tx_pool) :
@@ -925,7 +940,8 @@ difficulty_type Blockchain::get_difficulty_for_next_block()
     m_difficulties = difficulties;
   }
   size_t target = get_difficulty_target();
-  difficulty_type diff = next_difficulty(timestamps, difficulties, target);
+  difficulty_type diff = feelcoin_difficulty_for_version(
+    timestamps, difficulties, target, get_ideal_hard_fork_version(height));
 
   CRITICAL_REGION_LOCAL1(m_difficulty_lock);
   m_difficulty_for_next_block_top_hash = top_hash;
@@ -981,7 +997,8 @@ size_t Blockchain::recalculate_difficulties(boost::optional<uint64_t> start_heig
   for (uint64_t height = start_height; height <= top_height; ++height)
   {
     size_t target = get_ideal_hard_fork_version(height) < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
-    difficulty_type recalculated_diff = next_difficulty(timestamps, difficulties, target);
+    difficulty_type recalculated_diff = feelcoin_difficulty_for_version(
+      timestamps, difficulties, target, get_ideal_hard_fork_version(height));
 
     boost::multiprecision::uint256_t recalculated_cum_diff_256 = boost::multiprecision::uint256_t(recalculated_diff) + last_cum_diff;
     CHECK_AND_ASSERT_THROW_MES(recalculated_cum_diff_256 <= std::numeric_limits<difficulty_type>::max(), "Difficulty overflow!");
@@ -1286,7 +1303,8 @@ difficulty_type Blockchain::get_next_difficulty_for_alternative_chain(const std:
   size_t target = get_ideal_hard_fork_version(bei.height) < 2 ? DIFFICULTY_TARGET_V1 : DIFFICULTY_TARGET_V2;
 
   // calculate the difficulty target for the block and return it
-  return next_difficulty(timestamps, cumulative_difficulties, target);
+  return feelcoin_difficulty_for_version(
+    timestamps, cumulative_difficulties, target, get_ideal_hard_fork_version(bei.height));
 }
 //------------------------------------------------------------------
 // This function does a sanity check on basic things that all miner
@@ -4099,6 +4117,16 @@ uint64_t Blockchain::get_adjusted_time(uint64_t height) const
 bool Blockchain::check_block_timestamp(std::vector<uint64_t>& timestamps, const block& b, uint64_t& median_ts) const
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
+  // On alternative chains v17 uses the same future-time tolerance as
+  // the main chain. Historical pre-v17 behavior is intentionally unchanged.
+  // Callers validate the block's hardfork version before reaching here.
+  if (b.major_version >= HF_VERSION_FEELCOIN_LWMA &&
+      !feelcoin_timestamp_within_future_limit(
+        b.timestamp, static_cast<uint64_t>(time(NULL)), b.major_version))
+  {
+    MERROR_VER("Feelcoin v17 alternative block timestamp exceeds future tolerance");
+    return false;
+  }
   median_ts = epee::misc_utils::median(timestamps);
 
   if(b.timestamp < median_ts)
@@ -4120,13 +4148,16 @@ bool Blockchain::check_block_timestamp(std::vector<uint64_t>& timestamps, const 
 bool Blockchain::check_block_timestamp(const block& b, uint64_t& median_ts) const
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
-  if(b.timestamp > (uint64_t)time(NULL) + CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT)
+  const auto h = m_db->height();
+  const auto timestamp_rules_version = get_ideal_hard_fork_version(h);
+  if (!feelcoin_timestamp_within_future_limit(
+        b.timestamp, static_cast<uint64_t>(time(NULL)), timestamp_rules_version))
   {
-    MERROR_VER("Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than local time + 2 hours");
+    MERROR_VER("Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp
+      << ", exceeds the permitted future tolerance for consensus version "
+      << static_cast<unsigned>(timestamp_rules_version));
     return false;
   }
-
-  const auto h = m_db->height();
 
   // if not enough blocks, no proper median yet, return true
   if(h < BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW)
