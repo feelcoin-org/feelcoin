@@ -96,15 +96,23 @@ jobs:
           lib=desktop-source/src-tauri/resources/lib
           mkdir -p "$target" "$lib"
           find "$target" -maxdepth 1 -type f -delete
-          find "$lib" -maxdepth 1 -type f ! -name libcom_err.so.2 -delete
+          # CRITICAL: the old GUI repo tracked libcom_err.so.2 linked against GLIBC_2.38,
+          # incompatible with the Ubuntu 22.04 runtime. Use the native OS library instead.
+          find "$lib" -maxdepth 1 -type f -delete
+          test ! -e "$lib/libcom_err.so.2"
+          test -n "$(ldconfig -p | grep 'libcom_err.so.2' || true)"
           for exe in feelcoind feelcoin-wallet-rpc; do
             cp "linux-core-extract/$exe" "$target/$exe"
             chmod +x "$target/$exe"
             test "$(od -An -tx1 -N4 "$target/$exe" | tr -d ' \n')" = 7f454c46
             "$target/$exe" --version | tee "/tmp/$exe-version"
             grep -Fq 'v1.0.0-6b1a1f08f' "/tmp/$exe-version"
-            LD_LIBRARY_PATH="$(realpath "$lib")" ldd "$target/$exe" | tee "/tmp/$exe-ldd"
-            if grep -q 'not found' "/tmp/$exe-ldd"; then echo "Missing Linux runtime libraries: $exe"; exit 1; fi
+            # Do not override the system loader paths with legacy packaged libraries.
+            ldd "$target/$exe" | tee "/tmp/$exe-ldd"
+            if grep -Eq 'not found|version .+ not found' "/tmp/$exe-ldd"; then
+              echo "ERROR: Linux runtime dependency incompatible for $exe"
+              exit 1
+            fi
           done
           python3 - <<'PY'
           import pathlib,json
@@ -112,8 +120,8 @@ jobs:
           f=root/'tauri.conf.json'
           cfg=json.loads(f.read_text())
           cfg['bundle']['resources']=['resources/bin/feelcoind','resources/bin/feelcoin-wallet-rpc']
-          if (root/'resources/lib/libcom_err.so.2').exists():
-              cfg['bundle']['resources'].append('resources/lib/libcom_err.so.2')
+          # Never ship GLIBC-incompatible legacy .so from v0.3.0 Desktop.
+          assert not (root/'resources/lib/libcom_err.so.2').exists()
           f.write_text(json.dumps(cfg,indent=2)+'\n')
           assert all('.exe' not in s and '.dll' not in s for s in cfg['bundle']['resources'])
           print('Linux resources:',cfg['bundle']['resources'])
