@@ -1,0 +1,201 @@
+name: Feelcoin v1 Linux native installers and clean install QA
+on:
+  push:
+    branches: [feature/v17-consensus-audit]
+    paths:
+      - '.github/workflows/v1-linux-native-install-qa.yml'
+      - 'scripts/release/linux_deb_deps.py'
+      - 'scripts/release/wallet_offline_qa.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build Ubuntu package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned full Core source and submodules
+        uses: actions/checkout@v4
+        with:
+          ref: 6b1a1f08f82fb1ce33343ee512f852872553f824
+          path: core-source
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify pinned Core source and host OS
+        run: |
+          set -euo pipefail
+          cat /etc/os-release
+          test "$(git -C core-source rev-parse HEAD)" = 6b1a1f08f82fb1ce33343ee512f852872553f824
+          grep -Fq '{ 17, 21205, 0,' core-source/src/hardforks/hardforks.cpp
+          grep -Fq 'DEF_FEELCOIN_VERSION "1.0.0"' core-source/src/version.cpp.in
+      - name: Install distro's own build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential cmake git pkg-config dpkg-dev dpkg patchelf \
+            libboost-all-dev libunbound-dev libunwind-dev libssl-dev \
+            libzmq3-dev libsodium-dev libprotobuf-dev protobuf-compiler \
+            libreadline-dev libhidapi-dev libusb-1.0-0-dev libicu-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Compile native Ubuntu Core with current Boost and ICU
+        run: |
+          set -euo pipefail
+          cmake -S core-source -B core-build \
+            -D ARCH=default -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_TESTS=OFF -D BUILD_DOCUMENTATION=OFF \
+            -D USE_DEVICE_TREZOR=OFF -D USE_DEVICE_TREZOR_LIBUSB=OFF
+          cmake --build core-build --parallel 2 --target daemon simplewallet wallet_rpc_server
+          for exe in feelcoind feelcoin-wallet-cli feelcoin-wallet-rpc; do
+            test -x "core-build/bin/$exe"
+            "core-build/bin/$exe" --version | tee "/tmp/$exe-version"
+            grep -Fq 'v1.0.0-6b1a1f08f' "/tmp/$exe-version"
+            ldd "core-build/bin/$exe" | tee "/tmp/$exe-ldd"
+            if grep -Eq 'not found|version .* not found' "/tmp/$exe-ldd"; then exit 1; fi
+          done
+      - name: Offline mnemonic restore and matching-address QA (disposable wallets)
+        run: |
+          set -euo pipefail
+          python3 scripts/release/wallet_offline_qa.py core-build/bin
+      - name: Fetch exact last published full Desktop GUI
+        run: |
+          set -euo pipefail
+          git init desktop-source
+          git -C desktop-source fetch --depth 1 \
+            https://github.com/feelcoin-org/feelcoin-desktop.git \
+            b89c7630a4fd530217716e060cd47a9631f8a8d6
+          git -C desktop-source checkout --detach FETCH_HEAD
+          test "$(git -C desktop-source rev-parse HEAD)" = b89c7630a4fd530217716e060cd47a9631f8a8d6
+          grep -Fq 'fn start_local_services' desktop-source/src-tauri/src/lib.rs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop-source/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Update QA GUI version and bundle ONLY native Core binaries
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib,re
+          root=pathlib.Path('desktop-source')
+          for name in ('package.json','package-lock.json','src-tauri/tauri.conf.json'):
+              p=root/name
+              d=json.loads(p.read_text())
+              if name!='package-lock.json':
+                  assert d['version']=='0.3.0'
+              d['version']='1.0.0'
+              if name=='package-lock.json' and '' in d.get('packages',{}):
+                  d['packages']['']['version']='1.0.0'
+              if name=='src-tauri/tauri.conf.json':
+                  d['bundle']['resources']=['resources/bin/feelcoind','resources/bin/feelcoin-wallet-rpc']
+              p.write_text(json.dumps(d,indent=2)+'\n')
+          p=root/'src-tauri/Cargo.toml'
+          data,count=re.subn(r'(?m)^version\s*=\s*"0\.3\.0"$','version = "1.0.0"',p.read_text(),count=1)
+          assert count==1
+          p.write_text(data)
+          PY
+          bin=desktop-source/src-tauri/resources/bin
+          lib=desktop-source/src-tauri/resources/lib
+          mkdir -p "$bin" "$lib"
+          find "$bin" "$lib" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          cp core-build/bin/feelcoind core-build/bin/feelcoin-wallet-rpc "$bin/"
+          chmod +x "$bin/"*
+          test ! -e "$lib/libcom_err.so.2"
+          cmp core-build/bin/feelcoind "$bin/feelcoind"
+          cmp core-build/bin/feelcoin-wallet-rpc "$bin/feelcoin-wallet-rpc"
+          if find "$bin" "$lib" -type f \( -iname '*.exe' -o -iname '*.dll' \) | grep -q .; then exit 1; fi
+      - name: Build local Ubuntu DEB and AppImage (QA only)
+        working-directory: desktop-source
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npx tauri icon public/feelcoin-logo.png --fit contain
+          npx tauri build --bundles deb,appimage
+      - name: Embed native Core dependencies into distro-specific DEB and verify
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          deb="$(find desktop-source/src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -print -quit)"
+          app="$(find desktop-source/src-tauri/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$deb" && test -n "$app"
+          . /etc/os-release
+          python3 scripts/release/linux_deb_deps.py \
+            "$deb" "dist/Feelcoin-v1.0.0-Ubuntu-$VERSION_ID-x64-QA.deb" \
+            core-build/bin/feelcoind core-build/bin/feelcoin-wallet-rpc
+          cp "$app" "dist/Feelcoin-v1.0.0-Ubuntu-$VERSION_ID-x64-QA.AppImage"
+          dpkg-deb --contents dist/*.deb > dist/DEB-CONTENTS.txt
+          grep -Fq 'feelcoind' dist/DEB-CONTENTS.txt
+          grep -Fq 'feelcoin-wallet-rpc' dist/DEB-CONTENTS.txt
+          if grep -Ei '\.(exe|dll|bat|ps1)([[:space:]]|$)' dist/DEB-CONTENTS.txt; then exit 1; fi
+          app_abs="$(realpath dist/*.AppImage)"
+          chmod +x "$app_abs"
+          mkdir appimage-audit
+          (cd appimage-audit && "$app_abs" --appimage-extract >/dev/null)
+          test -n "$(find appimage-audit/squashfs-root -type f -name feelcoind -print -quit)"
+          test -n "$(find appimage-audit/squashfs-root -type f -name feelcoin-wallet-rpc -print -quit)"
+          if find appimage-audit/squashfs-root -type f \( -iname '*.exe' -o -iname '*.dll' \) | grep -q .; then exit 1; fi
+          (cd dist && sha256sum *.deb *.AppImage > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          printf '%s\n' \
+            "Feelcoin v1.0.0 QA, native Ubuntu $VERSION_ID, not public release." \
+            'Core source 6b1a1f08f82fb1ce33343ee512f852872553f824' \
+            'Desktop source b89c7630a4fd530217716e060cd47a9631f8a8d6' \
+            'Mainnet activation and final security/consensus approval pending.' \
+            'Test with disposable wallets and do not install over real wallets.' \
+            > dist/README-QA.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feelcoin-v1.0.0-${{ matrix.os }}-x64-qa
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+  clean-install:
+    name: Clean Ubuntu package installation (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: build
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: feelcoin-v1.0.0-${{ matrix.os }}-x64-qa
+          path: qa
+      - name: Install on fresh Ubuntu and check native binaries
+        run: |
+          set -euo pipefail
+          cd qa
+          sha256sum -c SHA256SUMS.txt
+          deb="$(find . -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$deb"
+          dpkg-deb --field "$deb" Depends | tee DEPENDENCIES.txt
+          grep -Eq 'libboost|libicu' DEPENDENCIES.txt
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$PWD/$deb"
+          pkg="$(dpkg-deb --field "$deb" Package)"
+          dpkg -s "$pkg" | grep -F 'Status: install ok installed'
+          dpkg -L "$pkg" | tee INSTALLED-FILES.txt
+          for exe in feelcoind feelcoin-wallet-rpc; do
+            installed="$(dpkg -L "$pkg" | grep -E "/resources/bin/$exe$" | head -1)"
+            test -n "$installed" && test -x "$installed"
+            "$installed" --version | tee "$exe-version.txt"
+            grep -Fq 'v1.0.0-6b1a1f08f' "$exe-version.txt"
+            ldd "$installed" | tee "$exe-ldd.txt"
+            if grep -Eq 'not found|version .* not found' "$exe-ldd.txt"; then exit 1; fi
+          done
+          echo 'PASS: clean Ubuntu install and native Core executable dependency validation'
