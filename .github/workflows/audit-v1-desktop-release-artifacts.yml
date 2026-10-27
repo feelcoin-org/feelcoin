@@ -1,0 +1,63 @@
+name: Audit v1.0.0 Desktop source-to-asset provenance
+
+on:
+  push:
+    branches:
+      - audit/provenance-v1-desktop-artifacts-20261027
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Retrieve original October 24 Linux QA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: feelcoin-desktop-v1.0.0-linux-x64-QA
+          repository: feelcoin-org/feelcoin
+          run-id: 40092195491
+          github-token: ${{ github.token }}
+          path: original-linux
+      - name: Retrieve original October 24 Windows QA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: feelcoin-desktop-v1.0.0-windows-x64-QA
+          repository: feelcoin-org/feelcoin
+          run-id: 40083129764
+          github-token: ${{ github.token }}
+          path: original-windows
+      - name: Compare exact candidate installer bytes with current published release
+        shell: bash
+        run: |
+          set -euo pipefail
+          find original-linux original-windows -maxdepth 2 -type f -printf '%p %s bytes\n'
+          python3 - <<'PY'
+          import hashlib, pathlib
+          expected = {
+            'ubuntu22_deb': 'a9c81a94abba83dad75ac8ee1580b6e5b1a959c668ff691456cd6096931f4e88',
+            'ubuntu22_app': '6cb4641b5a0b0a7490daaebac6122186284b938cababefe37879aa67963a5d0c',
+            'windows_setup': '3adcd643f4c11c6035624ac3f94ee2b9e45130d74a7a108b29df55080213cc4b',
+          }
+          files=[p for folder in ('original-linux','original-windows') for p in pathlib.Path(folder).rglob('*') if p.is_file()]
+          found = {}
+          for p in files:
+              n=p.name.lower()
+              kind=None
+              if n.endswith('.deb') and '22.04' in n: kind='ubuntu22_deb'
+              elif n.endswith('.appimage') and '22.04' in n: kind='ubuntu22_app'
+              elif n.endswith('.exe') and '1.0.0' in n: kind='windows_setup'
+              if not kind: continue
+              digest=hashlib.sha256(p.read_bytes()).hexdigest()
+              print(f'QA_ORIGINAL {kind} {p.name} sha256={digest}',flush=True)
+              assert kind not in found, f'duplicate {kind}'
+              found[kind]=digest
+          assert set(found)==set(expected), f'missing/extra files {found.keys()}'
+          for kind, digest in expected.items():
+              assert found[kind]==digest, f'{kind}: original QA digest differs from published release!'
+              print('PASS_EXACT_ORIGINAL_QA_BYTES',kind,flush=True)
+          print('PASS_RELEASE_SOURCE_TO_BINARY_PROVENANCE: pinned Desktop GUI b89c763 + Core 6b1a1f08f',flush=True)
+          PY
