@@ -59,7 +59,7 @@ Current priority.
 - HTTPS/TLS deployment across public services
 - Mobile-responsive ecosystem navigation
 - GitHub repositories and public documentation standardized around the canonical `feelcoin.org` domain
-- Feelcoin Technical Whitepaper v1.2 published (revision needed for protocol v17)
+- Feelcoin Technical Whitepaper v1.3 published, documenting the activated v17 protocol
 - Stable desktop wallet v1.0.0 for Windows and Ubuntu Linux
 - Android wallet v0.3.1
 - Bitcointalk ANN published and updated for v17
@@ -68,7 +68,7 @@ Current priority.
 ### Current Work
 
 - Maintain the Bitcointalk ANN and improve the mining guide
-- Update the technical whitepaper for protocol v17
+- Keep the technical whitepaper aligned with subsequent protocol releases
 - Add safe automatic reconciliation of ambiguous pool payouts
 - Improve miner onboarding and troubleshooting guides
 - Publish clearer wallet backup and recovery guidance
