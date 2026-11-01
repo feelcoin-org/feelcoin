@@ -3,7 +3,7 @@
 **Project:** Feelcoin (FEEL)  
 **Motto:** *In Feels We Trust*  
 **Status:** Early-stage independent RandomX Proof-of-Work network  
-**Roadmap version:** 5 October 2026
+**Roadmap updated:** 1 November 2026
 
 > This roadmap describes current development direction. It is not a promise of fixed dates, market outcomes, exchange listings, or future value.
 
@@ -39,7 +39,9 @@ Consensus economics and operational infrastructure strengthened.
 - Automatic pool payouts
 - Systemd service recovery and startup dependencies
 - Public graphical pool dashboard
-- v0.2.0 release published
+- Core v1.0.0 / protocol v17 hard fork activated at mainnet height 21,205
+- LWMA difficulty adjustment and revised timestamp validation
+- Wallet RPC payout timeout hardening deployed; automatic reconciliation of uncertain transfers remains planned
 
 ## Phase III — Public Launch & Accessibility 🚀
 
@@ -57,11 +59,17 @@ Current priority.
 - HTTPS/TLS deployment across public services
 - Mobile-responsive ecosystem navigation
 - GitHub repositories and public documentation standardized around the canonical `feelcoin.org` domain
-- Feelcoin Technical Whitepaper v1.2 published
+- Feelcoin Technical Whitepaper v1.2 published (revision needed for protocol v17)
+- Stable desktop wallet v1.0.0 for Windows and Ubuntu Linux
+- Android wallet v0.3.1
+- Bitcointalk ANN published and updated for v17
+- Independent third-party FEEL mining pool participation (VeinPool)
 
 ### Current Work
 
-- Publish Bitcointalk ANN and mining guide
+- Maintain the Bitcointalk ANN and improve the mining guide
+- Update the technical whitepaper for protocol v17
+- Add safe automatic reconciliation of ambiguous pool payouts
 - Improve miner onboarding and troubleshooting guides
 - Publish clearer wallet backup and recovery guidance
 - Improve paper-wallet security toward offline/client-side generation
@@ -112,6 +120,8 @@ Feelcoin development follows several standing principles:
 - Explorer: https://github.com/feelcoin-org/feelcoin-explorer
 - Web Wallet: https://github.com/feelcoin-org/feelcoin-web-wallet
 - Paper Wallet: https://github.com/feelcoin-org/feelcoin-paper-wallet
-- v0.2.0 Release: https://github.com/feelcoin-org/feelcoin/releases/tag/v0.2.0
+- Current Core release: https://github.com/feelcoin-org/feelcoin/releases/tag/v1.0.0
+- Desktop wallet: https://github.com/feelcoin-org/feelcoin-desktop
+- Android wallet: https://github.com/feelcoin-org/feelcoin-android
 
 **In Feels We Trust.**
