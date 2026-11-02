@@ -1,0 +1,190 @@
+name: Feelcoin Core v1.0.0 v17 combined candidate
+# Candidate artifacts only: no public release, no mainnet deployment.
+on:
+  push:
+    branches: [feature/v17-consensus-audit]
+    paths:
+      - '.github/workflows/v17-windows-candidate.yml'
+      - 'src/**'
+      - 'cmake/**'
+      - 'external/**'
+      - 'contrib/**'
+      - 'CMakeLists.txt'
+      - 'Makefile'
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x64 Core + CLI/RPC + DLL verification
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          cache: false
+          install: >-
+            mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-boost mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-zeromq mingw-w64-x86_64-libsodium
+            mingw-w64-x86_64-protobuf-c mingw-w64-x86_64-unbound git
+      - name: Compile one pinned Windows candidate
+        run: |
+          set -e
+          grep -Fq '{ 17, 21205, 0,' src/hardforks/hardforks.cpp
+          grep -Fq 'DEF_FEELCOIN_VERSION "1.0.0"' src/version.cpp.in
+          cmake -S . -B build/release -G "MSYS Makefiles" \
+            -D STATIC=ON -D ARCH=x86-64 -D BUILD_64=ON \
+            -D CMAKE_BUILD_TYPE=Release -D BUILD_TAG=win-x64 \
+            -D CMAKE_TOOLCHAIN_FILE="$PWD/cmake/64-bit-toolchain.cmake" \
+            -D MSYS2_FOLDER="$(cd "$MINGW_PREFIX/.." && pwd -W)" \
+            -D USE_DEVICE_TREZOR=OFF -D USE_DEVICE_TREZOR_LIBUSB=OFF
+          cmake --build build/release --parallel 2
+          echo "FEEL_MINGW_BIN=$(cygpath -w "$MINGW_PREFIX/bin")" >> "$GITHUB_ENV"
+      - name: Stage Windows EXEs and recursively required native DLLs only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stage = (New-Item -ItemType Directory -Force "windows-stage").FullName
+          $mingw = $env:FEEL_MINGW_BIN
+          $objdump = Join-Path $mingw "objdump.exe"
+          if (!(Test-Path $objdump)) { $objdump = Join-Path $mingw "x86_64-w64-mingw32-objdump.exe" }
+          if (!(Test-Path $objdump)) { throw "Missing Windows PE import inspection tool" }
+          $exeNames = @("feelcoind.exe","feelcoin-wallet-cli.exe","feelcoin-wallet-rpc.exe")
+          $queue = [System.Collections.Generic.Queue[string]]::new()
+          foreach ($name in $exeNames) {
+            $src = Join-Path "build/release/bin" $name
+            if (!(Test-Path $src)) { throw "Missing compiled executable: $name" }
+            Copy-Item $src (Join-Path $stage $name)
+            $queue.Enqueue((Join-Path $stage $name))
+          }
+          $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+          while ($queue.Count -gt 0) {
+            $file = $queue.Dequeue()
+            $pe = [System.IO.File]::ReadAllBytes($file)
+            if ($pe.Length -lt 2 -or $pe[0] -ne 77 -or $pe[1] -ne 90) {
+              throw "Not a native Windows PE file: $file"
+            }
+            $imports = & $objdump -p $file
+            if ($LASTEXITCODE -ne 0) { throw "PE import inspection failed: $file" }
+            foreach ($line in $imports) {
+              if ($line -notmatch 'DLL Name:\s*(\S+)') { continue }
+              $name = $Matches[1]
+              if (!$seen.Add($name)) { continue }
+              if ($name -match '^(msys-|cygwin)' ) { throw "POSIX runtime rejected: $name" }
+              $source = Join-Path $mingw $name
+              if (Test-Path $source) {
+                $target = Join-Path $stage $name
+                Copy-Item $source $target
+                $queue.Enqueue($target)
+                Write-Host "Bundled native Windows runtime: $name"
+              } elseif ($name -match '^(api-ms-win-|ext-ms-)') {
+                continue
+              } elseif (Test-Path (Join-Path "$env:WINDIR\System32" $name)) {
+                continue
+              } else {
+                throw "Unresolved Windows DLL imported by $file : $name"
+              }
+            }
+          }
+          $all = @(Get-ChildItem $stage -File)
+          foreach ($f in $all) {
+            if ($f.Name -notmatch '^(feelcoind|feelcoin-wallet-cli|feelcoin-wallet-rpc)\.exe$|^[a-z0-9_.+-]+\.dll$') {
+              throw "Invalid Windows artifact file: $($f.Name)"
+            }
+          }
+          "Feelcoin Core v1.0.0 / consensus v17 target height 21205" |
+            Set-Content (Join-Path $stage "README-CANDIDATE.txt")
+          "Pre-release QA only: not approved for mainnet deployment. Windows executables and required Windows DLLs only." |
+            Add-Content (Join-Path $stage "README-CANDIDATE.txt")
+          $sums = foreach ($f in $all) {
+            "$((Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($f.Name)"
+          }
+          $sums | Set-Content (Join-Path $stage "SHA256SUMS.txt") -Encoding ascii
+      - name: Verify standalone launch without MSYS2 toolchain PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dir = (Resolve-Path "windows-stage").Path
+          $env:PATH = "$dir;$env:SystemRoot\System32;$env:SystemRoot"
+          foreach ($name in @("feelcoind.exe","feelcoin-wallet-cli.exe","feelcoin-wallet-rpc.exe")) {
+            & (Join-Path $dir $name) --version
+            if ($LASTEXITCODE -ne 0) { throw "$name runtime failed: $LASTEXITCODE" }
+          }
+      - name: Create Windows-only candidate archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $name = "feelcoin-core-v1.0.0-win64-UNSIGNED-CANDIDATE.zip"
+          $files = @(Get-ChildItem windows-stage -File)
+          foreach ($file in $files) {
+            if ($file.Name -notmatch '^(feelcoind|feelcoin-wallet-cli|feelcoin-wallet-rpc)\.exe$|^[a-z0-9_.+-]+\.dll$|^(README-CANDIDATE|SHA256SUMS)\.txt$') { throw "Non-Windows file detected" }
+          }
+          Compress-Archive -Path "windows-stage/*" -DestinationPath $name -CompressionLevel Optimal
+          (Get-FileHash $name -Algorithm SHA256).Hash.ToLowerInvariant() + "  " + $name | Set-Content "$name.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feelcoin-core-v1.0.0-win64-candidate
+          path: |
+            feelcoin-core-v1.0.0-win64-UNSIGNED-CANDIDATE.zip
+            feelcoin-core-v1.0.0-win64-UNSIGNED-CANDIDATE.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Ubuntu x64 Core + CLI/RPC + tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Install build libraries
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential cmake git pkg-config libboost-all-dev \
+            libunbound-dev libunwind-dev libssl-dev libzmq3-dev \
+            libsodium-dev libprotobuf-dev protobuf-compiler \
+            libreadline-dev libhidapi-dev libusb-1.0-0-dev libicu-dev
+      - name: Compile one pinned Linux candidate and tests
+        run: |
+          set -euo pipefail
+          grep -Fq '{ 17, 21205, 0,' src/hardforks/hardforks.cpp
+          grep -Fq 'DEF_FEELCOIN_VERSION "1.0.0"' src/version.cpp.in
+          cmake -S . -B build/release -D ARCH=default -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_TESTS=ON -D BUILD_DOCUMENTATION=OFF \
+            -D USE_DEVICE_TREZOR=OFF -D USE_DEVICE_TREZOR_LIBUSB=OFF
+          cmake --build build/release --parallel 2 --target daemon simplewallet wallet_rpc_server unit_tests
+          ctest --test-dir build/release -R '^unit_tests$' --output-on-failure
+      - name: Package Linux Core binaries (Desktop DEB/AppImage separately)
+        run: |
+          set -euo pipefail
+          mkdir -p linux-stage
+          for exe in feelcoind feelcoin-wallet-cli feelcoin-wallet-rpc; do
+            test -s "build/release/bin/$exe"
+            cp "build/release/bin/$exe" linux-stage/
+            "linux-stage/$exe" --version
+          done
+          echo "Feelcoin Core v1.0.0, protocol v17 at height 21205. QA only." > linux-stage/README-CANDIDATE.txt
+          (cd linux-stage && sha256sum feelcoind feelcoin-wallet-cli feelcoin-wallet-rpc > SHA256SUMS.txt)
+          tar -czf feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz -C linux-stage .
+          sha256sum feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz > feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feelcoin-core-v1.0.0-linux-x64-candidate
+          path: |
+            feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz
+            feelcoin-core-v1.0.0-linux-x64-CANDIDATE.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14
