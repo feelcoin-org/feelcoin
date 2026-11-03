@@ -7,23 +7,24 @@
 <!-- FEELCOIN-OFFICIAL-LINKS:START -->
 
 <!-- FEELCOIN-LATEST-RELEASE-START -->
+## Latest Stable Release — Core v1.0.0
 
-## Latest Stable Release — v0.2.1
+Feelcoin Core v1.0.0 introduces protocol v17 and includes our first official Windows x64 Core distribution.
 
-**Feelcoin Core v0.2.1** is now available for Linux x86_64.
+| Platform | Download |
+| --- | --- |
+| Windows x64 | [Core, Wallet CLI and RPC ZIP](https://github.com/feelcoin-org/feelcoin/releases/download/v1.0.0/feelcoin-core-v1.0.0-win64.zip) |
+| Ubuntu 26.04 x64 | [Core, Wallet CLI and RPC archive](https://github.com/feelcoin-org/feelcoin/releases/download/v1.0.0/feelcoin-core-v1.0.0-ubuntu26-x64.tar.gz) |
 
-This release improves network bootstrap and allows new Feelcoin nodes to
-automatically discover the mainnet through the official bootstrap nodes.
+[Release notes](https://github.com/feelcoin-org/feelcoin/releases/tag/v1.0.0) · [SHA-256 checksums](https://github.com/feelcoin-org/feelcoin/releases/download/v1.0.0/SHA256SUMS.txt) · [Desktop Wallet v1.0.0](https://github.com/feelcoin-org/feelcoin-desktop/releases/tag/v1.0.0)
 
-- **Linux x86_64:** [Download v0.2.1](https://github.com/feelcoin-org/feelcoin/releases/download/v0.2.1/feelcoin-v0.2.1-linux-x64.tar.gz)
-- **Release notes:** [Feelcoin Core v0.2.1](https://github.com/feelcoin-org/feelcoin/releases/tag/v0.2.1)
-- **SHA256 file:** [Download checksum](https://github.com/feelcoin-org/feelcoin/releases/download/v0.2.1/feelcoin-v0.2.1-linux-x64.tar.gz.sha256)
+### Mandatory protocol upgrade
 
-**SHA256**
+**Protocol v17 activates at mainnet block 21,205.** Full node operators, solo miners using their own daemon and mining pool operators must upgrade Core before activation. Official pool miners can continue using their existing compatible mining clients. Desktop Wallet users should update to the version bundled with Core v1.0.0.
 
-```text
-162b89f887e9df7572447c0d650fd8ed97f494cf97ccc17a9477ae214bf5adb1
-```
+**What's new:** integer-only 90-block LWMA difficulty adjustment (128-bit difficulty, 256-bit intermediate arithmetic), tighter 30-minute future-block timestamp validation, and main-chain/alternative-chain consistency. Original monetary rules, RandomX, 120-second target, 12 decimals, addresses, balances, tail emission and the consensus-enforced 2% treasury are unchanged.
+
+Back up wallet files and verify release checksums. Windows executables are not code-signed.
 
 ### Official bootstrap nodes
 
@@ -31,9 +32,6 @@ automatically discover the mainnet through the official bootstrap nodes.
 node1.feelcoin.org:35780
 node2.feelcoin.org:35780
 ```
-
-No consensus rules, mining algorithm, rewards, address formats, or emission
-parameters changed in v0.2.1. Existing pool miners do not need to update.
 
 <!-- FEELCOIN-LATEST-RELEASE-END -->
 
@@ -126,26 +124,6 @@ The Feelcoin ecosystem includes:
 - Mining pool
 - Block explorer
 - Paper wallet generator
-
----
-
-## Latest Release
-
-### Feelcoin v0.2.0 — Linux x64 / Windows x64
-
-Download the latest Feelcoin binaries from:
-
-https://github.com/feelcoin-org/feelcoin/releases/latest
-
-Included core binaries:
-
-- `feelcoind`
-- `feelcoin-wallet-cli`
-- `feelcoin-wallet-rpc`
-
-SHA-256 checksum files should be provided with release assets.
-
-Always verify checksums before running downloaded binaries.
 
 ---
 
@@ -428,7 +406,7 @@ Current ecosystem components include:
 - Block explorer
 - Paper wallet
 - Linux release
-- Windows release in preparation
+- Windows Core and Desktop v1.0.0 released
 - Consensus-enforced 2% development treasury
 
 ---
