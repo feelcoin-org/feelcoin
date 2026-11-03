@@ -83,6 +83,7 @@
 #define DIFFICULTY_LAG                                  15  // !!!
 #define DIFFICULTY_CUT                                  60  // timestamps to cut after sorting
 #define DIFFICULTY_BLOCKS_COUNT                         DIFFICULTY_WINDOW + DIFFICULTY_LAG
+#define HF_VERSION_FEELCOIN_LWMA                         17 // v17 is not yet scheduled on any network
 
 
 #define CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V1   DIFFICULTY_TARGET_V1 * CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS

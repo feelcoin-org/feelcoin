@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 #include "int-util.h"
 #include "cryptonote_basic/difficulty.h"
+#include "cryptonote_basic/feelcoin_lwma.h"
 
 static cryptonote::difficulty_type MKDIFF(uint64_t high, uint64_t low)
 {
@@ -71,4 +72,73 @@ TEST(difficulty, check_hash)
 
   ASSERT_TRUE(cryptonote::check_hash(MKHASH(0xffffffffffffffff, 1), MKDIFF(0xffffffffffffffff, 1)));
   ASSERT_FALSE(cryptonote::check_hash(MKHASH(0xffffffffffffffff, 1), MKDIFF(0xffffffffffffffff, 2)));
+}
+
+
+// Candidate v17 tests. The fork has no scheduled activation yet.
+static cryptonote::difficulty_type TEST_LWMA_CONSTANT(
+  uint64_t solvetime, uint64_t block_work, size_t window)
+{
+  std::vector<uint64_t> timestamps;
+  std::vector<cryptonote::difficulty_type> cumulative;
+  for (size_t i = 0; i <= window; ++i)
+  {
+    timestamps.push_back(1000000 + i * solvetime);
+    cumulative.push_back(cryptonote::difficulty_type(i + 1) * block_work);
+  }
+  return cryptonote::next_difficulty_lwma(timestamps, cumulative, 120, window);
+}
+
+TEST(difficulty, feelcoin_lwma_steady_60_and_90)
+{
+  ASSERT_EQ(1000, TEST_LWMA_CONSTANT(120, 1000, 60));
+  ASSERT_EQ(1000, TEST_LWMA_CONSTANT(120, 1000, 90));
+}
+
+TEST(difficulty, feelcoin_lwma_fast_and_slow_blocks)
+{
+  ASSERT_EQ(2000, TEST_LWMA_CONSTANT(60, 1000, 90));
+  ASSERT_EQ(500, TEST_LWMA_CONSTANT(240, 1000, 90));
+  ASSERT_EQ(166, TEST_LWMA_CONSTANT(720, 1000, 90));
+}
+
+TEST(difficulty, feelcoin_lwma_uses_newest_history)
+{
+  std::vector<uint64_t> timestamps;
+  std::vector<cryptonote::difficulty_type> cumulative;
+  for (size_t i = 0; i <= 110; ++i)
+  {
+    timestamps.push_back(1000000 + (i <= 20 ? i * 120 : 2400 + (i - 20) * 60));
+    cumulative.push_back(cryptonote::difficulty_type(i + 1) * 1000);
+  }
+  ASSERT_EQ(2000, cryptonote::next_difficulty_lwma(timestamps, cumulative, 120));
+}
+
+TEST(difficulty, feelcoin_lwma_timestamp_and_input_guards)
+{
+  std::vector<uint64_t> timestamps(91, 1000000);
+  std::vector<cryptonote::difficulty_type> cumulative;
+  for (size_t i = 0; i <= 90; ++i)
+    cumulative.push_back(cryptonote::difficulty_type(i + 1) * 1000);
+  ASSERT_GT(cryptonote::next_difficulty_lwma(timestamps, cumulative, 120), 0);
+  timestamps.assign(91, std::numeric_limits<uint64_t>::max());
+  ASSERT_GT(cryptonote::next_difficulty_lwma(timestamps, cumulative, 120), 0);
+  ASSERT_EQ(0, cryptonote::next_difficulty_lwma(timestamps, cumulative, 0));
+  ASSERT_EQ(0, cryptonote::next_difficulty_lwma(timestamps, cumulative, 120, 121));
+  ASSERT_EQ(0, cryptonote::next_difficulty_lwma(timestamps, {}, 120));
+  cumulative.back() = 0; // Bad cumulative work must be rejected.
+  ASSERT_EQ(0, cryptonote::next_difficulty_lwma(timestamps, cumulative, 120));
+}
+
+TEST(difficulty, feelcoin_lwma_128bit_work)
+{
+  const cryptonote::difficulty_type per_block = MKDIFF(1ULL << 55, 0);
+  std::vector<uint64_t> timestamps;
+  std::vector<cryptonote::difficulty_type> cumulative;
+  for (size_t i = 0; i <= 90; ++i)
+  {
+    timestamps.push_back(1000000 + i * 120);
+    cumulative.push_back(cryptonote::difficulty_type(i + 1) * per_block);
+  }
+  ASSERT_EQ(per_block, cryptonote::next_difficulty_lwma(timestamps, cumulative, 120));
 }
