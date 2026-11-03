@@ -1,0 +1,71 @@
+name: Verify v17 integration branch (Core)
+on:
+  push:
+    branches: [fix/integrate-v17-main-20261103]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'external/**'
+      - 'CMakeLists.txt'
+      - '.gitmodules'
+      - '.github/workflows/verify-v17-integration.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clean-build:
+    name: Core v17 clean build / Ubuntu ${{ matrix.ubuntu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['22.04', '24.04']
+    runs-on: ubuntu-${{ matrix.ubuntu }}
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify repository source and submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule status --recursive
+          if git submodule status --recursive | grep -Eq '^[+-U]'; then
+            echo 'ERROR: Incomplete or mismatched submodule checkout'
+            exit 1
+          fi
+          grep -Fq '{ 17, 21205, 0,' src/hardforks/hardforks.cpp
+          grep -Fq 'DEF_FEELCOIN_VERSION "1.0.0"' src/version.cpp.in
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential cmake git pkg-config libboost-all-dev \
+            libunbound-dev libunwind-dev libssl-dev libzmq3-dev \
+            libsodium-dev libprotobuf-dev protobuf-compiler \
+            libreadline-dev libhidapi-dev libusb-1.0-0-dev libicu-dev
+      - name: Compile Core and unit tests from this checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/v17-integration -D ARCH=default -D CMAKE_BUILD_TYPE=Release \
+            -D BUILD_TESTS=ON -D BUILD_DOCUMENTATION=OFF \
+            -D USE_DEVICE_TREZOR=OFF -D USE_DEVICE_TREZOR_LIBUSB=OFF
+          cmake --build build/v17-integration --parallel 2 \
+            --target daemon simplewallet wallet_rpc_server unit_tests
+      - name: Verify built daemon and consensus difficulty smoke
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test -s build/v17-integration/bin/feelcoind
+          build/v17-integration/bin/feelcoind --version
+          unit_test_bin="$(find build/v17-integration -type f -name unit_tests -perm /111 -print -quit)"
+          test -n "$unit_test_bin"
+          timeout --signal=TERM --kill-after=10s 420s \
+            "$unit_test_bin" --gtest_filter='difficulty.*'
