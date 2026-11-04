@@ -361,6 +361,18 @@ stop_mining
 
 Solo miners do not pay the official pool fee. The protocol-level 2% development treasury still applies from block 590 onward.
 
+### Community pools
+
+Independent pools, not operated by the Feelcoin team:
+
+| Pool | Modes | Stratum | Fee |
+|---|---|---|---|
+| [VEIN Pool](https://veinpool.fr/en/coin/feel) (EU) | PPLNS · SOLO · Squad | `veinpool.fr:3290` PPLNS · `3292` SOLO · `3293` Squad | 1 % |
+
+```bash
+xmrig -a rx/0 -o veinpool.fr:3290 -u <FEEL_ADDRESS>.rig1 -p x
+```
+
 ---
 
 ## Security
